@@ -18,7 +18,8 @@
   ],
   "require": {
     "php": "^8.3",
-    "illuminate/support": "^12"
+    "illuminate/support": "^12",
+    "php-amqplib/php-amqplib": "^3.7"
   },
   "require-dev": {
     "driftingly/rector-laravel": "^2.0",
