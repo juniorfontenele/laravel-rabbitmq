@@ -18,6 +18,20 @@ services:
             - '/home/sail/.vscode-server'
         networks:
             - sail
+        depends:
+            - rabbitmq
+
+    rabbitmq:
+        image: 'rabbitmq:4-management-alpine'
+        ports:
+            - '${FORWARD_RABBITMQ_PORT:-5672}:5672'
+            - '${FORWARD_RABBITMQ_MANAGEMENT_PORT:-15672}:15672'
+        networks:
+            - sail
+        healthcheck:
+            test: ["CMD", "rabbitmqctl", "node_health_check"]
+            retries: 3
+            timeout: 5s
 
 networks:
     sail:
