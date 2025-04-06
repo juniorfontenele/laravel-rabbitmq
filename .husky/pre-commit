@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+
+# Get list of staged files
+STAGED_FILES=$(git diff --cached --name-only)
+
+# Check if any PHP files in the monitored paths were modified
+ANALYZE_NEEDED=false
+for FILE in $STAGED_FILES; do
+    case "$FILE" in
+        app/*|config/*|database/*|resources/*|routes/*|tests/*)
+            ANALYZE_NEEDED=true
+            break
+            ;;
+    esac
+done
+
+# Only run PHPStan if relevant files were modified
+if [ "$ANALYZE_NEEDED" = true ]; then
+    echo "📝 Running PHP Rector..."
+    composer rector-commit
+
+    # Check PHP Rector exit code
+    if [ $? -ne 0 ]; then
+        echo "❌ PHP Rector check failed. Please fix the issues before committing."
+        exit 1
+    fi
+    echo "✅ PHP Rector check passed!"
+
+    echo "📝 Running PHPStan analysis..."
+    composer analyze-commit
+
+    # Check PHPStan exit code
+    if [ $? -ne 0 ]; then
+        echo "❌ PHPStan check failed. Please fix the issues before committing."
+        exit 1
+    fi
+    echo "✅ PHPStan check passed!"
+fi
+
+exit 0

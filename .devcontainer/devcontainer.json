@@ -1,0 +1,60 @@
+{
+  "name": "Laravel Package Development",
+  "dockerComposeFile": "docker-compose.yml",
+  "service": "app",
+  "workspaceFolder": "/app",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "adrianwilczynski.alpine-js-intellisense",
+        "naumovs.color-highlight",
+        "DEVSENSE.phptools-vscode",
+        "DEVSENSE.composer-php-vscode",
+        "ms-vscode-remote.remote-containers",
+        "ms-azuretools.vscode-docker",
+        "dracula-theme.theme-dracula",
+        "dbaeumer.vscode-eslint",
+        "mhutchie.git-graph",
+        "donjayamanne.githistory",
+        "arturock.gitstash",
+        "howardzuo.vscode-git-tags",
+        "github.vscode-github-actions",
+        "GitHub.codespaces",
+        "GitHub.copilot",
+        "GitHub.copilot-chat",
+        "GitHub.vscode-pull-request-github",
+        "eamodio.gitlens",
+        "ecmel.vscode-html-css",
+        "nhedger.inertia",
+        "VisualStudioExptTeam.vscodeintellicode",
+        "VisualStudioExptTeam.intellicode-api-usage-examples",
+        "DEVSENSE.intelli-php-vscode",
+        "skyran.js-jsx-snippets",
+        "laravel.vscode-laravel",
+        "ms-vscode.live-server",
+        "yzhang.markdown-all-in-one",
+        "PKief.material-icon-theme",
+        "christian-kohler.npm-intellisense",
+        "xdebug.php-debug",
+        "bmewburn.vscode-intelephense-client",
+        "DEVSENSE.profiler-php-vscode",
+        "ricardo-emerson.react-development-extensions-pack",
+        "ms-vscode-remote.vscode-remote-extensionpack",
+        "bradlc.vscode-tailwindcss",
+        "ms-vscode-remote.remote-wsl",
+        "mutantdino.resourcemonitor",
+        "esbenp.prettier-vscode",
+        "tombonnike.vscode-status-bar-format-toggle",
+        "open-southeners.laravel-pint",
+        "shd101wyy.markdown-preview-enhanced",
+        "m1guelpf.better-pest",
+        "tinkerun.tinkerun-vscode"
+      ],
+      "settings": {
+        "php.validate.executablePath": "/usr/local/bin/php"
+      }
+    }
+  },
+  "remoteUser": "sail",
+  "postCreateCommand": "echo 'alias a=\"php /app/artisan\"' >> ~/.bashrc && cd /app && chown -R sail:sail /app"
+}
