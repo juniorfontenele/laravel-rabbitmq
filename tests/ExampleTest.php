@@ -2,7 +2,7 @@
 
 declare(strict_types = 1);
 
-namespace VendorName\Skeleton\Tests;
+namespace JuniorFontenele\LaravelRabbitMQ\Tests;
 
 class ExampleTest extends TestCase
 {

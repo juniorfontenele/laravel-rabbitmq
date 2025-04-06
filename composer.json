@@ -1,11 +1,14 @@
 {
-  "name": "juniorfontenele/laravel-package",
-  "description": "Laravel package skeleton",
+  "name": "juniorfontenele/laravel-rabbitmq",
+  "description": "A Laravel package for RabbitMQ",
+  "type": "library",
   "keywords": [
     "laravel",
-    "package-skeleton"
+    "rabbitmq",
+    "queue",
+    "message-broker"
   ],
-  "homepage": "https://github.com/juniorfontenele/laravel-package-skeleton",
+  "homepage": "https://github.com/juniorfontenele/laravel-rabbitmq",
   "license": "MIT",
   "authors": [
     {
@@ -38,18 +41,18 @@
   },
   "autoload": {
     "psr-4": {
-      "VendorName\\Skeleton\\": "src"
+      "JuniorFontenele\\LaravelRabbitMQ\\": "src"
     }
   },
   "autoload-dev": {
     "psr-4": {
-      "VendorName\\Skeleton\\Tests\\": "tests"
+      "JuniorFontenele\\LaravelRabbitMQ\\Tests\\": "tests"
     }
   },
   "extra": {
     "laravel": {
       "providers": [
-        "VendorName\\Skeleton\\Providers\\SkeletonServiceProvider"
+        "JuniorFontenele\\LaravelRabbitMQ\\Providers\\LaravelRabbitMQServiceProvider"
       ],
       "dont-discover": [
         "orchestra/testbench",

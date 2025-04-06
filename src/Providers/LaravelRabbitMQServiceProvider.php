@@ -2,11 +2,11 @@
 
 declare(strict_types = 1);
 
-namespace VendorName\Skeleton\Providers;
+namespace JuniorFontenele\LaravelRabbitMQ\Providers;
 
 use Illuminate\Support\ServiceProvider;
 
-class SkeletonServiceProvider extends ServiceProvider
+class LaravelRabbitMQServiceProvider extends ServiceProvider
 {
     /**
      * Register services.

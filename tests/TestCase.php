@@ -2,7 +2,7 @@
 
 declare(strict_types = 1);
 
-namespace VendorName\Skeleton\Tests;
+namespace JuniorFontenele\LaravelRabbitMQ\Tests;
 
 use Illuminate\Config\Repository;
 use Illuminate\Database\Schema\Blueprint;
@@ -35,7 +35,7 @@ class TestCase extends OrchestraTestCase
     protected function getPackageProviders($app)
     {
         return [
-            \VendorName\Skeleton\Providers\SkeletonServiceProvider::class,
+            \JuniorFontenele\LaravelRabbitMQ\Providers\LaravelRabbitMQServiceProvider::class,
         ];
     }
 

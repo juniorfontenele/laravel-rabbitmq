@@ -1,5 +1,5 @@
 <?php
 
 return [
-    \VendorName\Skeleton\Providers\SkeletonServiceProvider::class,
+    \JuniorFontenele\LaravelRabbitMQ\Providers\LaravelRabbitMQServiceProvider::class,
 ];
