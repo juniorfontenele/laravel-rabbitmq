@@ -1,7 +1,7 @@
 # A Laravel package for RabbitMQ
 
 [![Latest Version on Packagist](https://img.shields.io/packagist/v/juniorfontenele/laravel-rabbitmq.svg?style=flat-square)](https://packagist.org/packages/juniorfontenele/laravel-rabbitmq)
-[![Tests](https://img.shields.io/github/actions/workflow/status/juniorfontenele/laravel-rabbitmq/run-tests.yml?branch=main&label=tests&style=flat-square)](https://github.com/juniorfontenele/laravel-rabbitmq/actions/workflows/run-tests.yml)
+[![Tests](https://img.shields.io/github/actions/workflow/status/juniorfontenele/laravel-rabbitmq/tests.yml?branch=main&label=tests&style=flat-square)](https://github.com/juniorfontenele/laravel-rabbitmq/actions/workflows/tests.yml)
 [![Total Downloads](https://img.shields.io/packagist/dt/juniorfontenele/laravel-rabbitmq.svg?style=flat-square)](https://packagist.org/packages/juniorfontenele/laravel-rabbitmq)
 
 This is where your description should go. Try and limit it to a paragraph or two. Consider adding a small example.
