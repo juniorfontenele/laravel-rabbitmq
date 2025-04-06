@@ -18,6 +18,15 @@ interface ConsumerInterface
     public function process(AMQPMessage $message): void;
 
     /**
+     * Consume the message.
+     *
+     * @param AMQPMessage $message
+     * @return void
+     * @throws Throwable
+     */
+    public function consume(AMQPMessage $message): void;
+
+    /**
      * Handle message processing failure.
      *
      * @param AMQPMessage $message

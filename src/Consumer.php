@@ -23,17 +23,29 @@ class Consumer implements ConsumerInterface
     public function process(AMQPMessage $message): void
     {
         try {
-            // Default implementation, to be overridden by specific consumers
-            $data = json_decode($message->getBody(), true);
-
-            // Process the message here...
-            Log::info('Processing RabbitMQ message', ['data' => $data]);
-
-            // Acknowledge the message
-            $message->ack();
+            $this->consume($message);
         } catch (Throwable $exception) {
             $this->failed($message, $exception);
         }
+    }
+
+    /**
+     * Process the message.
+     *
+     * @param AMQPMessage $message
+     * @return void
+     * @throws Throwable
+     */
+    public function consume(AMQPMessage $message): void
+    {
+        // Default implementation, to be overridden by specific consumers
+        $data = json_decode($message->getBody(), true);
+
+        // Process the message here...
+        Log::info('Processing RabbitMQ message', ['data' => $data]);
+
+        // Acknowledge the message
+        $message->ack();
     }
 
     /**
