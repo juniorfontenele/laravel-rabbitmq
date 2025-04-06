@@ -18,3 +18,16 @@ testbench.yaml          export-ignore
 /phpstan.neon.dist      export-ignore
 /phpstan-baseline.neon  export-ignore
 /.env.example           export-ignore
+/.husky                 export-ignore
+/phpstan.neon           export-ignore
+/tests                  export-ignore
+/.gitignore             export-ignore
+/rector.php             export-ignore
+/pint.json              export-ignore
+/phpunit.xml            export-ignore
+/phpunit.xml.dist       export-ignore
+/database               export-ignore
+/storage/rector         export-ignore
+/.php-cs-fixer.cache    export-ignore
+/.phpunit.cache         export-ignore
+/.phpunit.result.cache  export-ignore
