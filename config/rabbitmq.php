@@ -30,17 +30,7 @@ return [
         'default' => [
             'connection' => 'default',
             'name' => $appName . '.default',
-            'type' => 'direct', // direct, topic, fanout, headers
-            'passive' => false,
-            'durable' => true,
-            'auto_delete' => false,
-            'internal' => false,
-            'arguments' => [],
-        ],
-        'notifications' => [
-            'connection' => 'default',
-            'name' => $appName . '.notifications',
-            'type' => 'fanout',
+            'type' => 'fanout', // direct, topic, fanout, headers
             'passive' => false,
             'durable' => true,
             'auto_delete' => false,

@@ -1,40 +1,40 @@
 services:
-    app:
-        build:
-            context: .
-            dockerfile: Dockerfile
-            args:
-                WWWUSER_ID: ${WWWUSER_ID:-1000}
-                WWWGROUP_ID: ${WWWGROUP_ID:-1000}
-        tty: true
-        environment:
-            XDEBUG_MODE: ${XDEBUG_MODE:-off}
-            XDEBUG_CONFIG: "client_host=host.docker.internal"
-        extra_hosts:
-            - "host.docker.internal:host-gateway"
-        volumes:
-            - '../:/app'
-            - 'sail-profile:/home/sail:cached'
-            - '/home/sail/.vscode-server'
-        networks:
-            - sail
-        depends:
-            - rabbitmq
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        WWWUSER_ID: ${WWWUSER_ID:-1000}
+        WWWGROUP_ID: ${WWWGROUP_ID:-1000}
+    tty: true
+    environment:
+      XDEBUG_MODE: ${XDEBUG_MODE:-off}
+      XDEBUG_CONFIG: "client_host=host.docker.internal"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - '../:/app'
+      - 'sail-profile:/home/sail:cached'
+      - '/home/sail/.vscode-server'
+    networks:
+      - sail
+    depends_on:
+      - rabbitmq
 
-    rabbitmq:
-        image: 'rabbitmq:4-management-alpine'
-        ports:
-            - '${FORWARD_RABBITMQ_PORT:-5672}:5672'
-            - '${FORWARD_RABBITMQ_MANAGEMENT_PORT:-15672}:15672'
-        networks:
-            - sail
-        healthcheck:
-            test: ["CMD", "rabbitmqctl", "node_health_check"]
-            retries: 3
-            timeout: 5s
+  rabbitmq:
+    image: 'rabbitmq:4-management-alpine'
+    ports:
+      - '${FORWARD_RABBITMQ_PORT:-5672}:5672'
+      - '${FORWARD_RABBITMQ_MANAGEMENT_PORT:-15672}:15672'
+    networks:
+      - sail
+    healthcheck:
+      test: [ "CMD", "rabbitmqctl", "node_health_check" ]
+      retries: 3
+      timeout: 5s
 
 networks:
-    sail:
-        driver: bridge
+  sail:
+    driver: bridge
 volumes:
-    sail-profile:
+  sail-profile:
