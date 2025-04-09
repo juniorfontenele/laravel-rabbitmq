@@ -90,10 +90,11 @@ class Connection
         if ($config['ssl']['enabled']) {
             $connectionConfig = new AMQPConnectionConfig();
             $connectionConfig->setHost($config['host']);
-            $connectionConfig->setPort($config['port']);
+            $connectionConfig->setPort((int) $config['port']);
             $connectionConfig->setUser($config['user']);
             $connectionConfig->setPassword($config['password']);
             $connectionConfig->setVhost($config['vhost']);
+            $connectionConfig->setIsSecure(true);
             $connectionConfig->setSslCaCert($config['ssl']['cafile']);
             $connectionConfig->setSslCert($config['ssl']['local_cert']);
             $connectionConfig->setSslKey($config['ssl']['local_key']);
