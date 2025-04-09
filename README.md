@@ -168,11 +168,10 @@ RabbitMQ::publish('default', [
 ]);
 
 // Publishing with options
-RabbitMQ::publish('notifications', $data, [
+RabbitMQ::publish($exchangeName, $data, $routingKey, [
     'message_id' => uniqid(),
     'correlation_id' => $correlationId,
-    'headers' => ['priority' => 'high'],
-    'routing_key' => 'notifications.email'
+    'headers' => ['priority' => 'high']
 ]);
 ```
 
@@ -201,10 +200,10 @@ class NotificationsConsumer extends Consumer
     public function consume(AMQPMessage $message): void
     {
         $data = json_decode($message->getBody(), true);
-        
+
         // Process the message
         // ...
-        
+
         // Acknowledge the message after successful processing
         $message->ack();
     }
@@ -323,7 +322,7 @@ public function failed(AMQPMessage $message, Throwable $exception): void
         'message' => $message->getBody(),
         'exception' => $exception->getMessage()
     ]);
-    
+
     // Call parent implementation or handle completely custom
     parent::failed($message, $exception);
 }
