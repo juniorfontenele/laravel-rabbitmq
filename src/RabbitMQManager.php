@@ -173,23 +173,52 @@ class RabbitMQManager
     }
 
     /**
+     * Setup the RabbitMQ exchange.
+     *
+     * @param string $exchangeName
+     * @param AMQPChannel $channel
+     * @return void
+     * @throws RabbitMQException
+     */
+    public function setupExchange(string $exchangeName, AMQPChannel $channel): void
+    {
+        $exchangeConfig = config("rabbitmq.exchanges.{$exchangeName}");
+
+        if (empty($exchangeConfig)) {
+            throw new RabbitMQException("Exchange [{$exchangeName}] not configured.");
+        }
+
+        // Declare the exchange
+        $channel->exchange_declare(
+            $exchangeConfig['name'],
+            $exchangeConfig['type'],
+            $exchangeConfig['passive'] ?? false,
+            $exchangeConfig['durable'] ?? true,
+            $exchangeConfig['auto_delete'] ?? false,
+            $exchangeConfig['internal'] ?? false,
+            false, // nowait
+            $exchangeConfig['arguments'] ?? []
+        );
+    }
+
+    /**
      * Publish a message to the specified queue.
      *
-     * @param string $queueName
+     * @param string $exchangeName
      * @param mixed $data
+     * @param string $routingKey
      * @param array<string, mixed> $options
      * @return void
      * @throws RabbitMQException
      */
-    public function publish(string $queueName, $data, array $options = []): void
+    public function publish(string $exchangeName, $data, string $routingKey = '', array $options = []): void
     {
-        $queueConfig = config("rabbitmq.queues.{$queueName}");
-        $exchangeConfig = config("rabbitmq.exchanges.{$queueConfig['exchange']}");
+        $exchangeConfig = config("rabbitmq.exchanges.{$exchangeName}");
         $connectionName = $exchangeConfig['connection'] ?? 'default';
 
         $channel = $this->connection->getChannel($connectionName);
 
-        $config = $this->setupChannel($queueName, $channel);
+        $this->setupExchange($exchangeName, $channel);
 
         // Prepare message properties
         $properties = [
@@ -218,11 +247,9 @@ class RabbitMQManager
         // Create and publish message
         $message = new AMQPMessage($messageBody, $properties);
 
-        $routingKey = $options['routing_key'] ?? $config['queue']['routing_key'] ?? '';
-
         $channel->basic_publish(
             $message,
-            $config['exchange']['name'],
+            $exchangeConfig['name'],
             $routingKey,
         );
     }
