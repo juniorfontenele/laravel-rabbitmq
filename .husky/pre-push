@@ -1,7 +1,25 @@
 #!/usr/bin/env bash
 
-# Get list of files being pushed
-PUSHED_FILES=$(git diff --name-only $(git merge-base HEAD origin/$(git rev-parse --abbrev-ref HEAD)) HEAD)
+# Get the list of files being pushed in a more robust way
+CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
+PUSHED_FILES=""
+
+# Check if we're pushing a new branch or an existing one
+if git rev-parse --verify origin/$CURRENT_BRANCH &>/dev/null; then
+    # Branch exists on remote, get changed files
+    PUSHED_FILES=$(git diff --name-only origin/$CURRENT_BRANCH...HEAD)
+else
+    # New branch, get all files different from the default branch (usually main/master)
+    # Try main first, then master if main doesn't exist
+    if git rev-parse --verify origin/main &>/dev/null; then
+        PUSHED_FILES=$(git diff --name-only origin/main...HEAD)
+    elif git rev-parse --verify origin/master &>/dev/null; then
+        PUSHED_FILES=$(git diff --name-only origin/master...HEAD)
+    else
+        # Fallback: get all files in the last few commits
+        PUSHED_FILES=$(git diff --name-only HEAD~10...HEAD)
+    fi
+fi
 
 # Check if any PHP files in the monitored paths were modified
 ANALYZE_NEEDED=false
