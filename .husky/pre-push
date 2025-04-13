@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 
-# Get list of staged files
-STAGED_FILES=$(git diff --cached --name-only)
+# Get list of files being pushed
+PUSHED_FILES=$(git diff --name-only $(git merge-base HEAD origin/$(git rev-parse --abbrev-ref HEAD)) HEAD)
 
 # Check if any PHP files in the monitored paths were modified
 ANALYZE_NEEDED=false
-for FILE in $STAGED_FILES; do
+for FILE in $PUSHED_FILES; do
     case "$FILE" in
         app/*|config/*|database/*|resources/*|routes/*|tests/*)
             ANALYZE_NEEDED=true
@@ -21,7 +21,7 @@ if [ "$ANALYZE_NEEDED" = true ]; then
 
     # Check PHP Rector exit code
     if [ $? -ne 0 ]; then
-        echo "❌ PHP Rector check failed. Please fix the issues before committing."
+        echo "❌ PHP Rector check failed. Please fix the issues before pushing."
         exit 1
     fi
     echo "✅ PHP Rector check passed!"
@@ -31,7 +31,7 @@ if [ "$ANALYZE_NEEDED" = true ]; then
 
     # Check PHPStan exit code
     if [ $? -ne 0 ]; then
-        echo "❌ PHPStan check failed. Please fix the issues before committing."
+        echo "❌ PHPStan check failed. Please fix the issues before pushing."
         exit 1
     fi
     echo "✅ PHPStan check passed!"
