@@ -7,6 +7,7 @@ namespace JuniorFontenele\LaravelRabbitMQ\Providers;
 use Illuminate\Foundation\AliasLoader;
 use Illuminate\Support\ServiceProvider;
 use JuniorFontenele\LaravelRabbitMQ\Connection;
+use JuniorFontenele\LaravelRabbitMQ\Console\Commands\RabbitMQInstallCommand;
 use JuniorFontenele\LaravelRabbitMQ\Console\Commands\RabbitMQWorkCommand;
 use JuniorFontenele\LaravelRabbitMQ\Consumer;
 use JuniorFontenele\LaravelRabbitMQ\Contracts\ConsumerInterface;
@@ -55,6 +56,7 @@ class LaravelRabbitMQServiceProvider extends ServiceProvider
         if ($this->app->runningInConsole()) {
             $this->commands([
                 RabbitMQWorkCommand::class,
+                RabbitMQInstallCommand::class,
             ]);
         }
     }
