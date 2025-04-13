@@ -10,7 +10,7 @@ $consumerTag = 'consumer.' . $appName . '.' . $hostname;
 
 return [
     'sign_messages' => env('RABBITMQ_SIGN_MESSAGES_ENABLED', false),
-    'sign_algorithm' => OPENSSL_ALGO_SHA256,
+    'sign_algo' => env('RABBITMQ_SIGN_ALGO', 'sha256'),
     'public_key' => env('RABBITMQ_SIGN_PUBLIC_KEY'),
     'private_key' => env('RABBITMQ_SIGN_PRIVATE_KEY'),
 

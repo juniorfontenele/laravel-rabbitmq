@@ -19,7 +19,7 @@ class EventMessage implements MessageInterface
      */
     final protected function __construct(
         protected string $event,
-        protected array $data = [],
+        protected array $data,
         protected string $routingKey = '',
         protected array $options = [],
     ) {
@@ -60,7 +60,7 @@ class EventMessage implements MessageInterface
         $data = [
             'timestamp' => now()->toIso8601ZuluString(),
             'app' => config('app.name'),
-            'id' => $messageId,
+            'message_id' => $messageId,
             'correlation_id' => $correlationId,
             'nonce' => $nonce,
             'hostname' => gethostname(),
@@ -92,7 +92,7 @@ class EventMessage implements MessageInterface
         return $this->data['signature'] ?? '';
     }
 
-    public function signatureIsValid(string $publicKey, int $algo = OPENSSL_ALGO_SHA256): bool
+    public function signatureIsValid(string $publicKey, string $algo = 'sha256'): bool
     {
         if (! static::signIsEnabled()) {
             return true;
@@ -112,7 +112,7 @@ class EventMessage implements MessageInterface
             $dataString,
             $signature,
             $publicKey,
-            $algo
+            static::getAlgorithmFromString($algo)
         ) === 1;
     }
 
@@ -197,15 +197,28 @@ class EventMessage implements MessageInterface
 
         $dataString = json_encode($data, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES);
 
+        $algorithm = static::getAlgorithmFromString(config('rabbitmq.sign_algo', 'sha256'));
+
         openssl_sign(
             $dataString,
             $signature,
             $privateKey,
-            OPENSSL_ALGO_SHA256
+            $algorithm
         );
 
         $base64Signature = base64_encode($signature);
 
         return $base64Signature;
+    }
+
+    protected static function getAlgorithmFromString(string $algo): int
+    {
+        $contantName = 'OPENSSL_ALGO_' . strtoupper($algo);
+
+        if (defined($contantName)) {
+            return constant($contantName);
+        }
+
+        throw new MessageException('Invalid algorithm: ' . $algo);
     }
 }

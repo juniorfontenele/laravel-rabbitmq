@@ -41,5 +41,5 @@ interface MessageInterface
 
     public function getSignature(): string;
 
-    public function signatureIsValid(string $publicKey, int $algo = OPENSSL_ALGO_SHA256): bool;
+    public function signatureIsValid(string $publicKey, string $algo = 'sha256'): bool;
 }
