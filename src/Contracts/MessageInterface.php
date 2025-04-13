@@ -27,11 +27,7 @@ interface MessageInterface
     /** @return array<string, mixed> */
     public function getOptions(): array;
 
-    public function messageId(string $messageId): static;
-
     public function getMessageId(): string;
-
-    public function correlationId(string $correlationId): static;
 
     public function getCorrelationId(): string;
 
@@ -40,4 +36,10 @@ interface MessageInterface
 
     /** @return array<string, mixed> */
     public function getPayload(): array;
+
+    public function getNonce(): string;
+
+    public function getSignature(): string;
+
+    public function signatureIsValid(string $publicKey, int $algo = OPENSSL_ALGO_SHA256): bool;
 }

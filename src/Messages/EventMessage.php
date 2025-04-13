@@ -4,6 +4,7 @@ declare(strict_types = 1);
 
 namespace JuniorFontenele\LaravelRabbitMQ\Messages;
 
+use Illuminate\Support\Str;
 use JuniorFontenele\LaravelRabbitMQ\Contracts\MessageInterface;
 use JuniorFontenele\LaravelRabbitMQ\Exceptions\MessageException;
 use PhpAmqpLib\Message\AMQPMessage;
@@ -22,7 +23,8 @@ class EventMessage implements MessageInterface
         protected string $routingKey = '',
         protected array $options = [],
     ) {
-        //
+        $this->options['message_id'] = $this->data['message_id'];
+        $this->options['correlation_id'] = $this->data['correlation_id'];
     }
 
     public static function tryFrom(AMQPMessage $message): static
@@ -40,14 +42,6 @@ class EventMessage implements MessageInterface
             options: $message->get_properties()
         );
 
-        if ($message->has('message_id')) {
-            $eventMessage->messageId($message->get('message_id'));
-        }
-
-        if ($message->has('correlation_id')) {
-            $eventMessage->correlationId($message->get('correlation_id'));
-        }
-
         return $eventMessage;
     }
 
@@ -58,22 +52,68 @@ class EventMessage implements MessageInterface
      * @param array<string, mixed> $payload
      * @return static
      */
-    public static function make(string $event, array $payload = []): static
+    public static function make(string $event, array $payload = [], string $correlationId = ''): static
     {
+        $messageId = Str::uuid()->toString();
+        $nonce = bin2hex(random_bytes(16));
+
         $data = [
-            'timestamp' => now()->toIso8601String(),
+            'timestamp' => now()->toIso8601ZuluString(),
             'app' => config('app.name'),
+            'id' => $messageId,
+            'correlation_id' => $correlationId,
+            'nonce' => $nonce,
             'hostname' => gethostname(),
             'event' => $event,
             'payload' => $payload,
         ];
 
-        return new static($event, $data);
+        if (static::signIsEnabled()) {
+            $data['signature'] = static::generateSignature($data);
+        }
+
+        $eventMessage = new static($event, $data);
+
+        return $eventMessage;
     }
 
     public function getTimestamp(): ?string
     {
         return $this->data['timestamp'] ?? null;
+    }
+
+    public function getNonce(): string
+    {
+        return $this->data['nonce'];
+    }
+
+    public function getSignature(): string
+    {
+        return $this->data['signature'] ?? '';
+    }
+
+    public function signatureIsValid(string $publicKey, int $algo = OPENSSL_ALGO_SHA256): bool
+    {
+        if (! static::signIsEnabled()) {
+            return true;
+        }
+
+        $signature = base64_decode($this->getSignature());
+
+        $data = $this->data;
+
+        unset($data['signature']);
+
+        ksort($data);
+
+        $dataString = json_encode($data, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES);
+
+        return openssl_verify(
+            $dataString,
+            $signature,
+            $publicKey,
+            $algo
+        ) === 1;
     }
 
     public function routingKey(string $routingKey): static
@@ -127,27 +167,45 @@ class EventMessage implements MessageInterface
         return $this->options;
     }
 
-    public function messageId(string $messageId): static
-    {
-        $this->options['message_id'] = $messageId;
-
-        return $this;
-    }
-
     public function getMessageId(): string
     {
-        return $this->options['message_id'] ?? '';
-    }
-
-    public function correlationId(string $correlationId): static
-    {
-        $this->options['correlation_id'] = $correlationId;
-
-        return $this;
+        return $this->data['message_id'];
     }
 
     public function getCorrelationId(): string
     {
-        return $this->options['correlation_id'] ?? '';
+        return $this->data['correlation_id'];
+    }
+
+    protected static function signIsEnabled(): bool
+    {
+        return config('rabbitmq.sign_messages', false)
+            && (! empty(config('rabbitmq.public_key')))
+            && (! empty(config('rabbitmq.private_key')));
+    }
+
+    /** @param array<string, mixed> $data */
+    protected static function generateSignature(array $data): string
+    {
+        if (! static::signIsEnabled()) {
+            throw new MessageException('Trying to sign message but signing is disabled in rabbitmq.php config.');
+        }
+
+        $privateKey = config('rabbitmq.private_key');
+
+        ksort($data);
+
+        $dataString = json_encode($data, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES);
+
+        openssl_sign(
+            $dataString,
+            $signature,
+            $privateKey,
+            OPENSSL_ALGO_SHA256
+        );
+
+        $base64Signature = base64_encode($signature);
+
+        return $base64Signature;
     }
 }
