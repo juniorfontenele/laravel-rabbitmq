@@ -184,7 +184,7 @@ Create a custom consumer by extending the base `Consumer` class:
 ```php
 <?php
 
-namespace App\System\RabbitMQ\Consumers;
+namespace App\Consumers;
 
 use JuniorFontenele\LaravelRabbitMQ\Consumer;
 use PhpAmqpLib\Message\AMQPMessage;
@@ -219,7 +219,7 @@ Register your consumer in a service provider:
 
 namespace App\Providers;
 
-use App\System\RabbitMQ\Consumers\NotificationsConsumer;
+use App\Consumers\NotificationsConsumer;
 use Illuminate\Support\ServiceProvider;
 use JuniorFontenele\LaravelRabbitMQ\RabbitMQManager;
 
@@ -232,6 +232,10 @@ class AppServiceProvider extends ServiceProvider
     }
 }
 ```
+
+#### Consumer auto-discovery
+You can also auto-register consumers by adding them to the `App\Consumers`
+folder. You have to extend the base `JuniorFontenele\LaravelRabbitMQ\Consumer` class and use a studly name for class, e.g. `NotificationsConsumer` for the `notifications` queue. The package will automatically discover and register them.
 
 #### Starting a Worker
 
