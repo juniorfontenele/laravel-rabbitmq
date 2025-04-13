@@ -1,58 +1,23 @@
 #!/usr/bin/env bash
 
-# Get the list of files being pushed in a more robust way
-CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
-PUSHED_FILES=""
+echo "📝 Running PHP Rector..."
+composer rector-commit
 
-# Check if we're pushing a new branch or an existing one
-if git rev-parse --verify origin/$CURRENT_BRANCH &>/dev/null; then
-    # Branch exists on remote, get changed files
-    PUSHED_FILES=$(git diff --name-only origin/$CURRENT_BRANCH...HEAD)
-else
-    # New branch, get all files different from the default branch (usually main/master)
-    # Try main first, then master if main doesn't exist
-    if git rev-parse --verify origin/main &>/dev/null; then
-        PUSHED_FILES=$(git diff --name-only origin/main...HEAD)
-    elif git rev-parse --verify origin/master &>/dev/null; then
-        PUSHED_FILES=$(git diff --name-only origin/master...HEAD)
-    else
-        # Fallback: get all files in the last few commits
-        PUSHED_FILES=$(git diff --name-only HEAD~10...HEAD)
-    fi
+# Check PHP Rector exit code
+if [ $? -ne 0 ]; then
+    echo "❌ PHP Rector check failed. Please fix the issues before pushing."
+    exit 1
 fi
+echo "✅ PHP Rector check passed!"
 
-# Check if any PHP files in the monitored paths were modified
-ANALYZE_NEEDED=false
-for FILE in $PUSHED_FILES; do
-    case "$FILE" in
-        app/*|config/*|database/*|resources/*|routes/*|tests/*)
-            ANALYZE_NEEDED=true
-            break
-            ;;
-    esac
-done
+echo "📝 Running PHPStan analysis..."
+composer analyze-commit
 
-# Only run PHPStan if relevant files were modified
-if [ "$ANALYZE_NEEDED" = true ]; then
-    echo "📝 Running PHP Rector..."
-    composer rector-commit
-
-    # Check PHP Rector exit code
-    if [ $? -ne 0 ]; then
-        echo "❌ PHP Rector check failed. Please fix the issues before pushing."
-        exit 1
-    fi
-    echo "✅ PHP Rector check passed!"
-
-    echo "📝 Running PHPStan analysis..."
-    composer analyze-commit
-
-    # Check PHPStan exit code
-    if [ $? -ne 0 ]; then
-        echo "❌ PHPStan check failed. Please fix the issues before pushing."
-        exit 1
-    fi
-    echo "✅ PHPStan check passed!"
+# Check PHPStan exit code
+if [ $? -ne 0 ]; then
+    echo "❌ PHPStan check failed. Please fix the issues before pushing."
+    exit 1
 fi
+echo "✅ PHPStan check passed!"
 
 exit 0
