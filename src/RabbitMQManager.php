@@ -8,6 +8,7 @@ use Closure;
 use Illuminate\Container\Container;
 use Illuminate\Support\Str;
 use JuniorFontenele\LaravelRabbitMQ\Contracts\ConsumerInterface;
+use JuniorFontenele\LaravelRabbitMQ\Contracts\MessageInterface;
 use JuniorFontenele\LaravelRabbitMQ\Exceptions\RabbitMQException;
 use PhpAmqpLib\Channel\AMQPChannel;
 use PhpAmqpLib\Message\AMQPMessage;
@@ -74,7 +75,11 @@ class RabbitMQManager
         }
 
         // Try to resolve a specific consumer class based on queue name
-        $class = "App\\System\\RabbitMQ\\Consumers\\" . Str::studly($queue) . 'Consumer';
+        $class = "App\\Consumers\\" . Str::studly($queue);
+
+        if (class_exists($class . 'Consumer')) {
+            return $this->app->make($class . 'Consumer');
+        }
 
         if (class_exists($class)) {
             return $this->app->make($class);
@@ -205,14 +210,16 @@ class RabbitMQManager
      * Publish a message to the specified queue.
      *
      * @param string $exchangeName
-     * @param mixed $data
-     * @param string $routingKey
-     * @param array<string, mixed> $options
+     * @param MessageInterface $message
      * @return void
      * @throws RabbitMQException
      */
-    public function publish(string $exchangeName, $data, string $routingKey = '', array $options = []): void
+    public function publish(string $exchangeName, MessageInterface $message): void
     {
+        $routingKey = $message->getRoutingKey();
+        $options = $message->getOptions();
+        $data = $message->getData();
+
         $exchangeConfig = config("rabbitmq.exchanges.{$exchangeName}");
         $connectionName = $exchangeConfig['connection'] ?? 'default';
 
@@ -231,10 +238,7 @@ class RabbitMQManager
             $properties['application_headers'] = new AMQPTable($options['headers']);
         }
 
-        // Add message ID if provided
-        if (! empty($options['message_id'])) {
-            $properties['message_id'] = $options['message_id'];
-        }
+        $properties['message_id'] = $options['message_id'] ?? Str::uuid()->toString();
 
         // Add correlation ID if provided
         if (! empty($options['correlation_id'])) {
