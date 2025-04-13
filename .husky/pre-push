@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+
+echo "📝 Running PHP Rector..."
+composer rector-commit
+
+# Check PHP Rector exit code
+if [ $? -ne 0 ]; then
+    echo "❌ PHP Rector check failed. Please fix the issues before pushing."
+    exit 1
+fi
+echo "✅ PHP Rector check passed!"
+
+echo "📝 Running PHPStan analysis..."
+composer analyze-commit
+
+# Check PHPStan exit code
+if [ $? -ne 0 ]; then
+    echo "❌ PHPStan check failed. Please fix the issues before pushing."
+    exit 1
+fi
+echo "✅ PHPStan check passed!"
+
+exit 0
