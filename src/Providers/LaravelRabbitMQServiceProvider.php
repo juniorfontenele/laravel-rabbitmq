@@ -7,6 +7,7 @@ namespace JuniorFontenele\LaravelRabbitMQ\Providers;
 use Illuminate\Foundation\AliasLoader;
 use Illuminate\Support\ServiceProvider;
 use JuniorFontenele\LaravelRabbitMQ\Connection;
+use JuniorFontenele\LaravelRabbitMQ\Console\Commands\RabbitMQConsumerMakeCommand;
 use JuniorFontenele\LaravelRabbitMQ\Console\Commands\RabbitMQInstallCommand;
 use JuniorFontenele\LaravelRabbitMQ\Console\Commands\RabbitMQWorkCommand;
 use JuniorFontenele\LaravelRabbitMQ\Consumer;
@@ -57,6 +58,7 @@ class LaravelRabbitMQServiceProvider extends ServiceProvider
             $this->commands([
                 RabbitMQWorkCommand::class,
                 RabbitMQInstallCommand::class,
+                RabbitMQConsumerMakeCommand::class,
             ]);
         }
     }
@@ -71,5 +73,9 @@ class LaravelRabbitMQServiceProvider extends ServiceProvider
         $this->publishes([
             __DIR__ . '/../../config/rabbitmq.php' => config_path('rabbitmq.php'),
         ], 'config');
+
+        $this->publishes([
+            __DIR__ . '/../../stubs/consumer.stub' => base_path('stubs/consumer.stub'),
+        ], 'stubs');
     }
 }

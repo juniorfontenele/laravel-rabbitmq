@@ -1,0 +1,31 @@
+<?php
+
+declare(strict_types = 1);
+
+namespace App\Consumers;
+
+use Illuminate\Support\Facades\Log;
+use JuniorFontenele\LaravelRabbitMQ\Consumer;
+use PhpAmqpLib\Message\AMQPMessage;
+use Throwable;
+
+class {{ class }} extends Consumer
+{
+    /**
+     * Process the message.
+     *
+     * @param AMQPMessage $message
+     * @return void
+     * @throws Throwable
+     */
+    public function consume(AMQPMessage $message): void
+    {
+        $data = json_decode($message->getBody(), true);
+
+        // Process the message here...
+        Log::info('Processing RabbitMQ message', ['data' => $data]);
+
+        // Acknowledge the message
+        $message->ack();
+    }
+}
