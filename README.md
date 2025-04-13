@@ -160,20 +160,34 @@ You can publish messages using the RabbitMQ facade:
 
 ```php
 use JuniorFontenele\LaravelRabbitMQ\Facades\RabbitMQ;
-
-// Basic publishing
-RabbitMQ::publish('default', [
-    'id' => 1,
-    'message' => 'Hello, RabbitMQ!'
-]);
-
-// Publishing with options
-RabbitMQ::publish($exchangeName, $data, $routingKey, [
-    'message_id' => uniqid(),
-    'correlation_id' => $correlationId,
-    'headers' => ['priority' => 'high']
-]);
 ```
+
+The package provides a standardized `EventMessage` class that helps with formatting and handling messages:
+
+```php
+use JuniorFontenele\LaravelRabbitMQ\Facades\RabbitMQ;
+use JuniorFontenele\LaravelRabbitMQ\Messages\EventMessage;
+
+// Create a standardized event message
+$message = EventMessage::make('user.created', [
+    'id' => 123,
+    'name' => 'John Doe',
+    'email' => 'john@example.com'
+])
+    ->routingKey('user.events')
+    ->messageId(uniqid())
+    ->correlationId('request-123');
+
+// Publish the event message
+RabbitMQ::publish('default', $message);
+```
+
+The `EventMessage` automatically includes:
+- Timestamp
+- Application name
+- Hostname
+- Event name
+- Payload data
 
 ### Consuming Messages
 
@@ -187,6 +201,7 @@ Create a custom consumer by extending the base `Consumer` class:
 namespace App\Consumers;
 
 use JuniorFontenele\LaravelRabbitMQ\Consumer;
+use JuniorFontenele\LaravelRabbitMQ\Messages\EventMessage;
 use PhpAmqpLib\Message\AMQPMessage;
 
 class NotificationsConsumer extends Consumer
@@ -199,13 +214,52 @@ class NotificationsConsumer extends Consumer
      */
     public function consume(AMQPMessage $message): void
     {
-        $data = json_decode($message->getBody(), true);
-
-        // Process the message
-        // ...
+        // Parse message as a standard EventMessage
+        try {
+            $eventMessage = EventMessage::tryFrom($message);
+            
+            // Access standardized event data
+            $event = $eventMessage->getEvent();
+            $payload = $eventMessage->getPayload();
+            $messageId = $eventMessage->getMessageId();
+            $correlationId = $eventMessage->getCorrelationId();
+            
+            // Process based on event type
+            match($event) {
+                'user.created' => $this->handleUserCreated($payload),
+                'user.updated' => $this->handleUserUpdated($payload),
+                default => $this->handleUnknownEvent($event, $payload),
+            };
+            
+            // Or process as raw data
+            $data = json_decode($message->getBody(), true);
+            
+            // Process the message
+            // ...
+            
+        } catch (\Exception $e) {
+            // Handle error parsing the message
+            $this->failed($message, $e);
+            return;
+        }
 
         // Acknowledge the message after successful processing
         $message->ack();
+    }
+    
+    protected function handleUserCreated(array $payload): void
+    {
+        // Handle user created event
+    }
+    
+    protected function handleUserUpdated(array $payload): void
+    {
+        // Handle user updated event
+    }
+    
+    protected function handleUnknownEvent(string $event, array $payload): void
+    {
+        // Handle unknown event
     }
 }
 ```
@@ -349,12 +403,6 @@ The package includes tests that you can run:
 
 ```bash
 composer test
-```
-
-You can also run tests with coverage:
-
-```bash
-composer test-coverage
 ```
 
 To test your own implementation, you can mock the `RabbitMQManager` in your tests:
