@@ -34,7 +34,7 @@ composer require juniorfontenele/laravel-rabbitmq
 After installing, publish the configuration file:
 
 ```bash
-php artisan vendor:publish --tag=config --provider="JuniorFontenele\LaravelRabbitMQ\Providers\LaravelRabbitMQServiceProvider"
+php artisan rabbitmq:install
 ```
 
 ## Configuration
