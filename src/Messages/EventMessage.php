@@ -10,7 +10,13 @@ use PhpAmqpLib\Message\AMQPMessage;
 
 class EventMessage implements MessageInterface
 {
-    protected function __construct(
+    /**
+     * @param string $event
+     * @param array<string, mixed> $data
+     * @param string $routingKey
+     * @param array<string, mixed> $options
+     */
+    final protected function __construct(
         protected string $event,
         protected array $data = [],
         protected string $routingKey = '',
@@ -30,7 +36,7 @@ class EventMessage implements MessageInterface
         $eventMessage = new static(
             event: $data['event'],
             data: $data,
-            routingKey: $message->getRoutingKey(),
+            routingKey: $message->getRoutingKey() ?? '',
             options: $message->get_properties()
         );
 
@@ -45,6 +51,13 @@ class EventMessage implements MessageInterface
         return $eventMessage;
     }
 
+    /**
+     * Create a new event message instance.
+     *
+     * @param string $event
+     * @param array<string, mixed> $payload
+     * @return static
+     */
     public static function make(string $event, array $payload = []): static
     {
         $data = [
@@ -70,6 +83,7 @@ class EventMessage implements MessageInterface
         return $this;
     }
 
+    /** @param array<string, mixed> $payload */
     public function payload(array $payload): static
     {
         $this->data['payload'] = $payload;
@@ -77,11 +91,13 @@ class EventMessage implements MessageInterface
         return $this;
     }
 
+    /** @return array<string, mixed> */
     public function getPayload(): array
     {
         return $this->data['payload'];
     }
 
+    /** @param array<string, mixed> $options */
     public function options(array $options): static
     {
         $this->options = $options;
@@ -94,6 +110,7 @@ class EventMessage implements MessageInterface
         return $this->routingKey;
     }
 
+    /** @return array<string, mixed> */
     public function getData(): array
     {
         return $this->data;
@@ -104,6 +121,7 @@ class EventMessage implements MessageInterface
         return $this->event;
     }
 
+    /** @return array<string, mixed> */
     public function getOptions(): array
     {
         return $this->options;

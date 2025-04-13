@@ -246,7 +246,7 @@ class RabbitMQManager
         }
 
         // Prepare message body
-        $messageBody = is_string($data) ? $data : (string) json_encode($data);
+        $messageBody = (string) json_encode($data);
 
         // Create and publish message
         $message = new AMQPMessage($messageBody, $properties);

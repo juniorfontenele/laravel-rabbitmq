@@ -14,14 +14,17 @@ interface MessageInterface
 
     public function routingKey(string $routingKey): static;
 
+    /** @param array<string, mixed> $options */
     public function options(array $options): static;
 
     public function getRoutingKey(): string;
 
+    /** @return array<string, mixed> */
     public function getData(): array;
 
     public function getEvent(): string;
 
+    /** @return array<string, mixed> */
     public function getOptions(): array;
 
     public function messageId(string $messageId): static;
@@ -31,4 +34,10 @@ interface MessageInterface
     public function correlationId(string $correlationId): static;
 
     public function getCorrelationId(): string;
+
+    /** @param array<string, mixed> $payload */
+    public function payload(array $payload): static;
+
+    /** @return array<string, mixed> */
+    public function getPayload(): array;
 }

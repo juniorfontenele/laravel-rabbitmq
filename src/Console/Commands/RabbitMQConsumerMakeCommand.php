@@ -79,7 +79,7 @@ class RabbitMQConsumerMakeCommand extends GeneratorCommand
     /**
      * Get the console command options.
      *
-     * @return array
+     * @return array<mixed>
      */
     protected function getOptions()
     {
