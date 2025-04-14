@@ -43,8 +43,6 @@ interface MessageInterface
 
     public function getSignature(): string;
 
-    public function getSigningAlgorithm(): string;
-
     /**
      * @param string $publicKey
      * @throws MessageSignatureException
