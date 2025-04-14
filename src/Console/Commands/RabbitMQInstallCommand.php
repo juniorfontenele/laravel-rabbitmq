@@ -5,6 +5,7 @@ declare(strict_types = 1);
 namespace JuniorFontenele\LaravelRabbitMQ\Console\Commands;
 
 use Illuminate\Console\Command;
+use JuniorFontenele\LaravelRabbitMQ\Providers\LaravelRabbitMQServiceProvider;
 
 class RabbitMQInstallCommand extends Command
 {
@@ -33,6 +34,7 @@ class RabbitMQInstallCommand extends Command
         $this->callSilent('vendor:publish', [
             '--tag' => 'config',
             '--force' => $this->option('force'),
+            '--provider' => LaravelRabbitMQServiceProvider::class,
         ]);
 
         $this->info('Laravel RabbitMQ Package installed successfully.');
