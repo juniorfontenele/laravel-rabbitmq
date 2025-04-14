@@ -4,9 +4,12 @@ declare(strict_types = 1);
 
 namespace JuniorFontenele\LaravelRabbitMQ\Messages;
 
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
 use JuniorFontenele\LaravelRabbitMQ\Contracts\MessageInterface;
 use JuniorFontenele\LaravelRabbitMQ\Exceptions\MessageException;
+use JuniorFontenele\LaravelRabbitMQ\Exceptions\MessageSignatureException;
+use JuniorFontenele\LaravelRabbitMQ\Exceptions\MessageSignatureExpiredException;
 use PhpAmqpLib\Message\AMQPMessage;
 
 class EventMessage implements MessageInterface
@@ -25,6 +28,10 @@ class EventMessage implements MessageInterface
     ) {
         $this->options['message_id'] = $this->data['message_id'];
         $this->options['correlation_id'] = $this->data['correlation_id'];
+
+        if ($this->signingIsEnabled()) {
+            $this->signMessage();
+        }
     }
 
     public static function tryFrom(AMQPMessage $message): static
@@ -68,18 +75,18 @@ class EventMessage implements MessageInterface
             'payload' => $payload,
         ];
 
-        if (static::signIsEnabled()) {
-            $data['signature'] = static::generateSignature($data);
-        }
-
         $eventMessage = new static($event, $data);
 
         return $eventMessage;
     }
 
-    public function getTimestamp(): ?string
+    public function getTimestamp(): Carbon
     {
-        return $this->data['timestamp'] ?? null;
+        if (! isset($this->data['timestamp'])) {
+            throw new MessageException('Message timestamp is not set.');
+        }
+
+        return Carbon::parse($this->data['timestamp']);
     }
 
     public function getNonce(): string
@@ -89,31 +96,90 @@ class EventMessage implements MessageInterface
 
     public function getSignature(): string
     {
+        if ($this->signingIsEnabled() && ! isset($this->data['signature'])) {
+            throw new MessageException('Message signature is not set.');
+        }
+
         return $this->data['signature'] ?? '';
     }
 
-    public function signatureIsValid(string $publicKey, string $algo = 'sha256'): bool
+    public function getSigningAlgorithm(): string
     {
-        if (! static::signIsEnabled()) {
-            return true;
+        if ($this->signingIsEnabled() && ! isset($this->data['signing_algorithm'])) {
+            throw new MessageException('Message signature algorithm is not set.');
+        }
+
+        return $this->data['signing_algorithm'] ?? '';
+    }
+
+    /**
+     * @param string $publicKey
+     * @throws MessageSignatureException
+     * @throws MessageSignatureExpiredException
+     * @throws MessageException
+     * @return void
+     */
+    public function validateSignature(string $publicKey): void
+    {
+        if (! $this->signingIsEnabled()) {
+            throw new MessageException('Message signing is not enabled.');
         }
 
         $signature = base64_decode($this->getSignature());
+        $algorithm = $this->getSigningAlgorithm();
 
-        $data = $this->data;
+        $receivedData = $this->data;
 
-        unset($data['signature']);
+        $dataToVerify = array_filter($receivedData, function ($key) {
+            return $key !== 'signature' && $key !== 'signing_algorithm';
+        }, ARRAY_FILTER_USE_KEY);
 
-        ksort($data);
+        $messageTimestamp = $this->getTimestamp();
+        $diff = $messageTimestamp->diffInSeconds(now());
 
-        $dataString = json_encode($data, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES);
+        $signTimeWindow = config('rabbitmq.message_signing.verification_time_window', 120);
 
-        return openssl_verify(
+        if ($diff > $signTimeWindow) {
+            throw new MessageSignatureExpiredException('Message signature is expired.');
+        }
+
+        if ($diff < -$signTimeWindow) {
+            throw new MessageSignatureExpiredException('Message signature is not yet valid.');
+        }
+
+        ksort($dataToVerify);
+
+        $dataString = json_encode($dataToVerify, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES);
+
+        $opensslAlgorithm = $this->getAlgorithmFromString($algorithm);
+
+        $opensslVerify = openssl_verify(
             $dataString,
             $signature,
             $publicKey,
-            static::getAlgorithmFromString($algo)
-        ) === 1;
+            $opensslAlgorithm
+        );
+
+        match ($opensslVerify) {
+            0 => throw new MessageSignatureException('Message signature is invalid.'),
+            -1 => throw new MessageException('Error verifying message signature: ' . openssl_error_string()),
+            default => null,
+        };
+    }
+
+    public function isSignatureValid(string $publicKey): bool
+    {
+        try {
+            $this->validateSignature($publicKey);
+
+            return true;
+        } catch (MessageSignatureException) {
+            return false;
+        } catch (MessageSignatureExpiredException) {
+            return false;
+        } catch (MessageException) {
+            return false;
+        }
     }
 
     public function routingKey(string $routingKey): static
@@ -177,48 +243,59 @@ class EventMessage implements MessageInterface
         return $this->data['correlation_id'];
     }
 
-    protected static function signIsEnabled(): bool
+    protected function signingIsEnabled(): bool
     {
-        return config('rabbitmq.sign_messages', false)
-            && (! empty(config('rabbitmq.public_key')))
-            && (! empty(config('rabbitmq.private_key')));
+        return config('rabbitmq.message_signing.enabled', false)
+            && (! empty(config('rabbitmq.message_signing.keys.private')))
+            && (! empty(config('rabbitmq.message_signing.keys.public')));
     }
 
-    /** @param array<string, mixed> $data */
-    protected static function generateSignature(array $data): string
+    protected function signMessage(): void
     {
-        if (! static::signIsEnabled()) {
+        if (! $this->signingIsEnabled()) {
             throw new MessageException('Trying to sign message but signing is disabled in rabbitmq.php config.');
         }
 
-        $privateKey = config('rabbitmq.private_key');
+        $privateKey = config('rabbitmq.message_signing.keys.private');
 
-        ksort($data);
+        $dataToSign = array_filter($this->data, function ($key) {
+            return $key !== 'signature' && $key !== 'signing_algorithm';
+        }, ARRAY_FILTER_USE_KEY);
 
-        $dataString = json_encode($data, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES);
+        ksort($dataToSign);
 
-        $algorithm = static::getAlgorithmFromString(config('rabbitmq.sign_algo', 'sha256'));
+        $dataString = json_encode($dataToSign, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES);
+
+        $algorithm = config('rabbitmq.message_signing.algorithm', 'sha256');
+        $opensslAlgorithm = $this->getAlgorithmFromString($algorithm);
 
         openssl_sign(
             $dataString,
             $signature,
             $privateKey,
-            $algorithm
+            $opensslAlgorithm
         );
 
         $base64Signature = base64_encode($signature);
 
-        return $base64Signature;
+        $this->data['signature'] = $base64Signature;
+        $this->data['signing_algorithm'] = $algorithm;
     }
 
-    protected static function getAlgorithmFromString(string $algo): int
+    protected function getAlgorithmFromString(string $algorithm): int
     {
-        $contantName = 'OPENSSL_ALGO_' . strtoupper($algo);
+        $allowedAlgorithms = config('rabbitmq.message_signing.allowed_algorithms', ['sha256', 'sha384', 'sha512']);
+
+        if (! in_array($algorithm, $allowedAlgorithms, true)) {
+            throw new MessageException('Invalid algorithm: ' . $algorithm);
+        }
+
+        $contantName = 'OPENSSL_ALGO_' . strtoupper($algorithm);
 
         if (defined($contantName)) {
             return constant($contantName);
         }
 
-        throw new MessageException('Invalid algorithm: ' . $algo);
+        throw new MessageException('Invalid algorithm: ' . $algorithm);
     }
 }

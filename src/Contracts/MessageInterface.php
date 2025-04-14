@@ -5,6 +5,8 @@ declare(strict_types = 1);
 namespace JuniorFontenele\LaravelRabbitMQ\Contracts;
 
 use JuniorFontenele\LaravelRabbitMQ\Exceptions\MessageException;
+use JuniorFontenele\LaravelRabbitMQ\Exceptions\MessageSignatureException;
+use JuniorFontenele\LaravelRabbitMQ\Exceptions\MessageSignatureExpiredException;
 use PhpAmqpLib\Message\AMQPMessage;
 
 interface MessageInterface
@@ -41,5 +43,16 @@ interface MessageInterface
 
     public function getSignature(): string;
 
-    public function signatureIsValid(string $publicKey, string $algo = 'sha256'): bool;
+    public function getSigningAlgorithm(): string;
+
+    /**
+     * @param string $publicKey
+     * @throws MessageSignatureException
+     * @throws MessageSignatureExpiredException
+     * @throws MessageException
+     * @return void
+     */
+    public function validateSignature(string $publicKey): void;
+
+    public function isSignatureValid(string $publicKey): bool;
 }

@@ -9,10 +9,20 @@ $appName = Str::snake(config('app.name'));
 $consumerTag = 'consumer.' . $appName . '.' . $hostname;
 
 return [
-    'sign_messages' => env('RABBITMQ_SIGN_MESSAGES_ENABLED', false),
-    'sign_algo' => env('RABBITMQ_SIGN_ALGO', 'sha256'),
-    'public_key' => env('RABBITMQ_SIGN_PUBLIC_KEY'),
-    'private_key' => env('RABBITMQ_SIGN_PRIVATE_KEY'),
+    'message_signing' => [
+        'enabled' => env('RABBITMQ_SIGNING_ENABLED', false),
+        'algorithm' => env('RABBITMQ_SIGNING_ALGORITHM', 'sha256'),
+        'allowed_algorithms' => [
+            'sha256',
+            'sha384',
+            'sha512',
+        ],
+        'verification_time_window' => env('RABBITMQ_SIGNING_TIME_WINDOW', 120), // in seconds
+        'keys' => [
+            'public' => env('RABBITMQ_SIGNING_PUBLIC_KEY'),
+            'private' => env('RABBITMQ_SIGNING_PRIVATE_KEY'),
+        ],
+    ],
 
     'connections' => [
         'default' => [
