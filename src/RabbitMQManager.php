@@ -174,7 +174,7 @@ class RabbitMQManager
             false
         );
 
-        return ['queue' => $queueConfig, 'exchange' => $exchangeConfig];
+        return ['queue' => $queueConfig, 'exchange' => $exchangeConfig, 'consumer_tag' => config('rabbitmq.consumer_tag')];
     }
 
     /**
