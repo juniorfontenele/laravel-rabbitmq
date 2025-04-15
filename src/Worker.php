@@ -364,7 +364,7 @@ class Worker
     /**
      * Restart the consumer on an existing connection
      */
-    public function restart()
+    public function restart(): void
     {
         $this->restart = true;
         $this->stopHard();
@@ -373,7 +373,7 @@ class Worker
     /**
      * Close the connection to the server
      */
-    public function stopHard()
+    public function stopHard(): void
     {
         $this->events->dispatch('rabbitmq.worker.stopping', ['hard', 0]);
         $this->manager->getConnection()->close();
@@ -382,7 +382,7 @@ class Worker
     /**
      * Close the channel to the server
      */
-    public function stopSoft()
+    public function stopSoft(): void
     {
         $this->events->dispatch('rabbitmq.worker.stopping', ['soft', 0]);
         $this->manager->getConnection()->getChannel()->close();
@@ -394,7 +394,7 @@ class Worker
      *
      * @param int $status
      */
-    public function stop(int $status = 0)
+    public function stop(int $status = 0): void
     {
         if ($status > 0) {
             $this->events->dispatch('rabbitmq.worker.stopping', ['stop', $status]);
