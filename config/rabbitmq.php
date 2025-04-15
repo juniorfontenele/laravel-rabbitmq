@@ -9,6 +9,8 @@ $appName = Str::snake(config('app.name'));
 $consumerTag = 'consumer.' . $appName . '.' . $hostname;
 
 return [
+    'consumer_tag' => env('RABBITMQ_CONSUMER_TAG', $consumerTag),
+
     'message_signing' => [
         'enabled' => env('RABBITMQ_SIGNING_ENABLED', false),
         'verification_time_window' => env('RABBITMQ_SIGNING_TIME_WINDOW', 120), // in seconds
@@ -38,7 +40,7 @@ return [
     'exchanges' => [
         'default' => [
             'connection' => 'default',
-            'name' => $appName . '.default',
+            'name' => 'default',
             'type' => 'fanout', // direct, topic, fanout, headers
             'passive' => false,
             'durable' => true,
@@ -50,10 +52,9 @@ return [
 
     'queues' => [
         'default' => [
-            'exchange' => 'default', // exchange configuration name
-            'name' => 'default_queue',
-            'routing_key' => 'default_queue',
-            'consumer_tag' => $consumerTag,
+            'name' => $appName . '.default',
+            'exchange' => 'default',
+            'routing_key' => '',
             'passive' => false,
             'durable' => true,
             'exclusive' => false,

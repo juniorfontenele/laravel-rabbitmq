@@ -3,8 +3,6 @@
 .php_cs.cache
 .phpunit.cache
 build
-composer.lock
-package-lock.json
 coverage
 docs
 vendor

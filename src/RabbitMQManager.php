@@ -174,7 +174,7 @@ class RabbitMQManager
             false
         );
 
-        return ['queue' => $queueConfig, 'exchange' => $exchangeConfig];
+        return ['queue' => $queueConfig, 'exchange' => $exchangeConfig, 'consumer_tag' => config('rabbitmq.consumer_tag')];
     }
 
     /**
@@ -296,7 +296,7 @@ class RabbitMQManager
         }
 
         // Setup consumer
-        $consumerTag = $options['consumer_tag'] ?? $config['queue']['consumer_tag'] ?? 'consumer_' . uniqid();
+        $consumerTag = $options['consumer_tag'] ?? $config['consumer_tag'] ?? 'consumer_' . uniqid();
 
         $channel->basic_consume(
             $config['queue']['name'],
