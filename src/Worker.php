@@ -180,6 +180,8 @@ class Worker
             // Dispatch before processing event
             $this->events->dispatch('rabbitmq.processing', [$message, $queue]);
 
+            $this->processMessage($message, $queue);
+
             // Dispatch after processing event
             $this->events->dispatch('rabbitmq.processed', [$message, $queue]);
 
