@@ -99,7 +99,7 @@ abstract class AbstractMessage implements MessageInterface
         return true;
     }
 
-    public function isRedelivered(): bool
+    public function isRedelivered(): ?bool
     {
         if (! isset($this->AMQPMessage)) {
             throw new MessageException('AMQPMessage instance is not set.');
@@ -141,7 +141,7 @@ abstract class AbstractMessage implements MessageInterface
      * @param string $routingKey The routing key to set
      * @return $this
      */
-    public function routingKey(string $routingKey): static
+    public function routingKey(string $routingKey): MessageInterface
     {
         $this->routingKey = $routingKey;
 
@@ -154,7 +154,7 @@ abstract class AbstractMessage implements MessageInterface
      * @param array<string, mixed> $payload The payload data
      * @return $this
      */
-    public function payload(array $payload): static
+    public function payload(array $payload): MessageInterface
     {
         $this->data['payload'] = $payload;
 
@@ -190,7 +190,7 @@ abstract class AbstractMessage implements MessageInterface
     }
 
     /** @param array<string, mixed> $options */
-    public function options(array $options): static
+    public function options(array $options): MessageInterface
     {
         $this->options = $options;
 

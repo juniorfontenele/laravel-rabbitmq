@@ -8,14 +8,14 @@ use Illuminate\Support\Str;
 use JuniorFontenele\LaravelRabbitMQ\Contracts\MessageInterface;
 use PhpAmqpLib\Message\AMQPMessage;
 
-class BasicMessage extends AbstractMessage implements MessageInterface
+class BasicMessage extends AbstractMessage
 {
     /**
      * BasicMessage constructor.
      *
      * @param array<string, mixed> $data The message data
      */
-    protected function __construct(array $data = [])
+    final protected function __construct(array $data = [])
     {
         $this->data = $data;
 
@@ -52,9 +52,9 @@ class BasicMessage extends AbstractMessage implements MessageInterface
      *
      * @param array<string, mixed> $payload
      * @param string $correlationId
-     * @return MessageInterface
+     * @return static
      */
-    public static function make(array $payload = [], string $correlationId = ''): MessageInterface
+    public static function make(array $payload = [], string $correlationId = ''): static
     {
         $messageId = Str::uuid()->toString();
         $nonce = bin2hex(random_bytes(16));

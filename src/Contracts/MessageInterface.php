@@ -24,7 +24,7 @@ interface MessageInterface
 
     public function reject(bool $requeue = true): bool;
 
-    public function isRedelivered(): bool;
+    public function isRedelivered(): ?bool;
 
     public function getConsumerTag(): ?string;
 

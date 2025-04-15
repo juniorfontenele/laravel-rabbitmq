@@ -4,7 +4,6 @@ declare(strict_types = 1);
 
 namespace JuniorFontenele\LaravelRabbitMQ\Messages;
 
-use Illuminate\Console\Scheduling\Event;
 use Illuminate\Support\Str;
 use JuniorFontenele\LaravelRabbitMQ\Contracts\EventMessageInterface;
 use JuniorFontenele\LaravelRabbitMQ\Exceptions\MessageException;
@@ -98,5 +97,33 @@ class EventMessage extends AbstractMessage implements EventMessageInterface
     public function getEvent(): string
     {
         return $this->event;
+    }
+
+    public function setAMQPMessageInstance(AMQPMessage $AMQPMessage): EventMessageInterface
+    {
+        parent::setAMQPMessageInstance($AMQPMessage);
+
+        return $this;
+    }
+
+    public function routingKey(string $routingKey): EventMessageInterface
+    {
+        parent::routingKey($routingKey);
+
+        return $this;
+    }
+
+    public function options(array $options): EventMessageInterface
+    {
+        parent::options($options);
+
+        return $this;
+    }
+
+    public function payload(array $payload): EventMessageInterface
+    {
+        parent::payload($payload);
+
+        return $this;
     }
 }
