@@ -9,6 +9,8 @@ $appName = Str::snake(config('app.name'));
 $consumerTag = 'consumer.' . $appName . '.' . $hostname;
 
 return [
+    'consumer_tag' => env('RABBITMQ_CONSUMER_TAG', $consumerTag),
+
     'message_signing' => [
         'enabled' => env('RABBITMQ_SIGNING_ENABLED', false),
         'verification_time_window' => env('RABBITMQ_SIGNING_TIME_WINDOW', 120), // in seconds
@@ -36,10 +38,32 @@ return [
     ],
 
     'exchanges' => [
-        'default' => [
+        'global_commands' => [
             'connection' => 'default',
-            'name' => $appName . '.default',
+            'name' => 'global.commands',
             'type' => 'fanout', // direct, topic, fanout, headers
+            'passive' => false,
+            'durable' => true,
+            'auto_delete' => false,
+            'internal' => false,
+            'arguments' => [],
+        ],
+
+        'app_commands' => [
+            'connection' => 'default',
+            'name' => $appName . '.commands',
+            'type' => 'fanout', // direct, topic, fanout, headers
+            'passive' => false,
+            'durable' => true,
+            'auto_delete' => false,
+            'internal' => false,
+            'arguments' => [],
+        ],
+
+        'events' => [
+            'connection' => 'default',
+            'name' => 'global.events',
+            'type' => 'topic', // direct, topic, fanout, headers
             'passive' => false,
             'durable' => true,
             'auto_delete' => false,
@@ -49,11 +73,30 @@ return [
     ],
 
     'queues' => [
-        'default' => [
-            'exchange' => 'default', // exchange configuration name
-            'name' => 'default_queue',
-            'routing_key' => 'default_queue',
-            'consumer_tag' => $consumerTag,
+        'global_commands' => [
+            'name' => $appName . '.commands',
+            'exchange' => 'global_commands',
+            'routing_key' => '',
+            'passive' => false,
+            'durable' => true,
+            'exclusive' => false,
+            'auto_delete' => false,
+            'arguments' => [],
+            'prefetch' => [
+                'count' => 1,
+                'size' => 0,
+            ],
+            'retry' => [
+                'enabled' => true,
+                'max_attempts' => 3,
+                'delay' => 60000, // in milliseconds
+            ],
+        ],
+
+        'app_commands' => [
+            'name' => $appName . '.commands',
+            'exchange' => 'app_commands',
+            'routing_key' => $appName . '.commands',
             'passive' => false,
             'durable' => true,
             'exclusive' => false,
