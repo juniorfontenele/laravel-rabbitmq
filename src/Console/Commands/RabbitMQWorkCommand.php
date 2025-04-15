@@ -5,6 +5,7 @@ declare(strict_types = 1);
 namespace JuniorFontenele\LaravelRabbitMQ\Console\Commands;
 
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\Event;
 use JuniorFontenele\LaravelRabbitMQ\Worker;
 
 class RabbitMQWorkCommand extends Command
@@ -53,14 +54,24 @@ class RabbitMQWorkCommand extends Command
         $this->info("Processing jobs from the [{$queue}] queue.");
 
         try {
-            $worker->work($queue, $options);
+            do {
+                $worker->work($queue, $options);
+            } while ($worker->shouldRestart());
         } catch (\Throwable $e) {
+            Event::dispatch('rabbitmq.worker.failed', [
+                $queue,
+                $options,
+                $e,
+            ]);
+
             $this->error($e->getMessage());
 
             $this->error('Failed to start the RabbitMQ worker.');
 
             return 1;
         }
+
+        $this->info('RabbitMQ worker stopped successfully.');
 
         return 0;
     }

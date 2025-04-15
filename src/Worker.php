@@ -7,6 +7,7 @@ namespace JuniorFontenele\LaravelRabbitMQ;
 use Illuminate\Contracts\Container\Container;
 use Illuminate\Contracts\Events\Dispatcher;
 use JuniorFontenele\LaravelRabbitMQ\Exceptions\RabbitMQException;
+use PhpAmqpLib\Channel\AMQPChannel;
 use PhpAmqpLib\Exception\AMQPTimeoutException;
 use PhpAmqpLib\Message\AMQPMessage;
 use Throwable;
@@ -33,6 +34,15 @@ class Worker
      * @var RabbitMQManager
      */
     protected RabbitMQManager $manager;
+
+    /**
+     * The RabbitMQ channel instance.
+     *
+     * @var AMQPChannel
+     */
+    protected AMQPChannel $channel;
+
+    protected string $consumerTag;
 
     /**
      * The worker options.
@@ -62,6 +72,8 @@ class Worker
      */
     protected int $jobsProcessed = 0;
 
+    protected bool $restart = false;
+
     /**
      * Create a new worker instance.
      *
@@ -75,6 +87,8 @@ class Worker
         $this->app = $app;
         $this->events = $events;
         $this->manager = $manager;
+
+        $this->registerSignals();
     }
 
     /**
@@ -87,6 +101,13 @@ class Worker
      */
     public function work(string $queue, array $options = []): void
     {
+        if ($this->restart) {
+            $this->events->dispatch('rabbitmq.worker.restarting', [$queue]);
+            $this->restart = false;
+        } else {
+            $this->events->dispatch('rabbitmq.worker.starting', [$queue]);
+        }
+
         $this->options = array_merge(
             config('rabbitmq.worker', []),
             $options
@@ -99,14 +120,16 @@ class Worker
         }
 
         $exchangeConfig = config("rabbitmq.exchanges.{$queueConfig['exchange']}", []);
-        $channel = $this->manager->getConnection()->getChannel($exchangeConfig['connection'] ?? 'default');
+        $this->channel = $this->manager->getConnection()->getChannel($exchangeConfig['connection'] ?? 'default');
 
-        $config = $this->manager->setupChannel($queue, $channel);
+        $config = $this->manager->setupChannel($queue, $this->channel);
+
+        $this->consumerTag = $config['consumer_tag'];
 
         // Setup consumer
-        $channel->basic_consume(
+        $this->channel->basic_consume(
             $config['queue']['name'],
-            $config['consumer_tag'],
+            $this->consumerTag,
             false,
             false,
             false,
@@ -116,26 +139,30 @@ class Worker
             }
         );
 
-        $this->listenForSignals();
-
+        $this->events->dispatch('rabbitmq.worker.started', [$queue]);
         // Start consuming
-        while ($channel->is_consuming()) {
+        while ($this->channel->is_consuming()) {
             try {
-                $channel->wait(null, true, $this->options['timeout'] ?? 60);
+                $this->channel->wait(null, false, $this->options['timeout'] ?? 60);
 
                 $this->stopIfNecessary();
             } catch (AMQPTimeoutException $e) {
+                $this->events->dispatch('rabbitmq.worker.timeout', [$queue, $e, $this->shouldSleep()]);
+
                 // Timeout waiting for a message
                 if ($this->shouldSleep()) {
                     $this->sleep();
                 }
             } catch (Throwable $e) {
+                $this->events->dispatch('rabbitmq.worker.error', [$queue, $e]);
                 $this->reportException($e);
 
                 // Sleep briefly before continuing
                 $this->sleep(1);
             }
         }
+
+        $this->events->dispatch('rabbitmq.worker.stopped', [$queue]);
     }
 
     /**
@@ -153,21 +180,7 @@ class Worker
             // Dispatch before processing event
             $this->events->dispatch('rabbitmq.processing', [$message, $queue]);
 
-            // Log the message if verbose mode
-            if ($this->options['verbose'] ?? false) {
-                $body = $message->getBody();
-                $this->app->make('log')->info("Processing message from queue [{$queue}]", [
-                    'body' => $body,
-                    'properties' => $message->get_properties(),
-                ]);
-
-                if ($this->app->runningInConsole() && isset($this->options['output'])) {
-                    $this->options['output']->writeln("<info>Processing message:</info> $body");
-                }
-            }
-
-            $consumer = $this->manager->getConsumer($queue);
-            $consumer->process($message);
+            $this->processMessage($message, $queue);
 
             // Dispatch after processing event
             $this->events->dispatch('rabbitmq.processed', [$message, $queue]);
@@ -180,6 +193,43 @@ class Worker
             $this->reportException($e);
         } finally {
             $this->currentJob = null;
+        }
+    }
+
+    /* Process the message with the appropriate consumer.
+    *
+    * @param AMQPMessage $message
+    * @param string $queue
+    * @return void
+    */
+    protected function processMessage(AMQPMessage $message, string $queue): void
+    {
+        // Log the message if verbose mode
+        if ($this->options['verbose'] ?? false) {
+            $this->logVerboseMessage($message, $queue);
+        }
+
+        $consumer = $this->manager->getConsumer($queue);
+        $consumer->process($message);
+    }
+
+    /**
+     * Log verbose message details.
+     *
+     * @param AMQPMessage $message
+     * @param string $queue
+     * @return void
+     */
+    protected function logVerboseMessage(AMQPMessage $message, string $queue): void
+    {
+        $body = $message->getBody();
+        $this->app->make('log')->info("Processing message from queue [{$queue}]", [
+            'body' => $body,
+            'properties' => $message->get_properties(),
+        ]);
+
+        if ($this->app->runningInConsole() && isset($this->options['output'])) {
+            $this->options['output']->writeln("<info>Processing message:</info> $body");
         }
     }
 
@@ -218,20 +268,6 @@ class Worker
         if ($this->memoryExceeded()) {
             $this->stop(12);
         }
-    }
-
-    /**
-     * Stop the worker.
-     *
-     * @param int $status
-     * @return void
-     */
-    public function stop(int $status = 0): void
-    {
-        // Close all connections
-        $this->manager->getConnection()->close();
-
-        exit($status);
     }
 
     /**
@@ -281,18 +317,122 @@ class Worker
      *
      * @return void
      */
-    protected function listenForSignals(): void
+    public function registerSignals(): void
     {
         if (extension_loaded('pcntl')) {
-            pcntl_async_signals(true);
+            define('AMQP_WITHOUT_SIGNALS', false);
 
-            pcntl_signal(SIGTERM, function () {
-                $this->stop();
-            });
+            pcntl_signal(SIGTERM, [$this, 'signalHandler']);
+            pcntl_signal(SIGHUP, [$this, 'signalHandler']);
+            pcntl_signal(SIGINT, [$this, 'signalHandler']);
+            pcntl_signal(SIGQUIT, [$this, 'signalHandler']);
+            pcntl_signal(SIGUSR1, [$this, 'signalHandler']);
+            pcntl_signal(SIGUSR2, [$this, 'signalHandler']);
+            pcntl_signal(SIGALRM, [$this, 'alarmHandler']);
+        } else {
+            echo 'Unable to process signals.' . PHP_EOL;
 
-            pcntl_signal(SIGINT, function () {
-                $this->stop();
-            });
+            exit(1);
         }
+    }
+
+    /**
+     * Signal handler
+     *
+     * @param  int $signalNumber
+     * @return void
+     */
+    public function signalHandler(int $signalNumber): void
+    {
+        $this->events->dispatch('rabbitmq.worker.signal', [$signalNumber]);
+
+        switch ($signalNumber) {
+            case SIGTERM:  // 15 : supervisor default stop
+            case SIGQUIT:  // 3  : kill -s QUIT
+                $this->stopHard();
+
+                break;
+            case SIGINT:   // 2  : ctrl + c
+                $this->stop();
+
+                break;
+            case SIGHUP:   // 1  : kill -s HUP
+                $this->restart();
+
+                break;
+            case SIGUSR1:  // 10 : kill -s USR1
+                pcntl_alarm(1);
+
+                break;
+            case SIGUSR2:  // 12 : kill -s USR2
+                pcntl_alarm(10);
+
+                break;
+            default:
+                break;
+        }
+    }
+
+    /**
+     * Alarm handler
+     *
+     * @param  int $signalNumber
+     * @return void
+     */
+    public function alarmHandler(int $signalNumber): void
+    {
+        $this->events->dispatch('rabbitmq.worker.alarm', [$signalNumber, memory_get_usage(true)]);
+    }
+
+    /**
+     * Restart the consumer on an existing connection
+     */
+    public function restart(): void
+    {
+        $this->restart = true;
+        $this->stopHard();
+    }
+
+    /**
+     * Close the connection to the server
+     */
+    public function stopHard(): void
+    {
+        $this->events->dispatch('rabbitmq.worker.stopping', ['hard', 0]);
+        $this->manager->getConnection()->close();
+    }
+
+    /**
+     * Close the channel to the server
+     */
+    public function stopSoft(): void
+    {
+        $this->events->dispatch('rabbitmq.worker.stopping', ['soft', 0]);
+        $this->manager->getConnection()->getChannel()->close();
+    }
+
+    /**
+     * Tell the server you are going to stop consuming
+     * It will finish up the last message and not send you any more
+     *
+     * @param int $status
+     */
+    public function stop(int $status = 0): void
+    {
+        if ($status > 0) {
+            $this->events->dispatch('rabbitmq.worker.stopping', ['stop', $status]);
+
+            exit($status);
+        }
+
+        $this->events->dispatch('rabbitmq.worker.stopping', ['stop', 0]);
+
+        // this gets stuck and will not exit without the last two parameters set
+        $this->channel->basic_cancel($this->consumerTag, false, true);
+    }
+
+    public function shouldRestart(): bool
+    {
+        return $this->restart;
     }
 }

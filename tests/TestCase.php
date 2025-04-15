@@ -6,6 +6,8 @@ namespace JuniorFontenele\LaravelRabbitMQ\Tests;
 
 use Illuminate\Config\Repository;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Foundation\Application;
+use JuniorFontenele\LaravelRabbitMQ\Providers\LaravelRabbitMQServiceProvider;
 use Orchestra\Testbench\TestCase as OrchestraTestCase;
 
 use function Orchestra\Testbench\workbench_path;
@@ -19,34 +21,18 @@ class TestCase extends OrchestraTestCase
     protected function setUp(): void
     {
         parent::setUp();
-
         $this->setUpDatabase($this->app);
     }
 
-    protected function tearDown(): void
-    {
-        parent::tearDown();
-    }
-
     /**
-     * @param  \Illuminate\Foundation\Application  $app
-     * @return array
-     */
-    protected function getPackageProviders($app)
-    {
-        return [
-            \JuniorFontenele\LaravelRabbitMQ\Providers\LaravelRabbitMQServiceProvider::class,
-        ];
-    }
-
-    /**
-     * Set up the environment.
+     * Define environment setup.
      *
-     * @param  \Illuminate\Foundation\Application  $app
+     * @param Application $app
+     * @return void
      */
-    protected function defineEnvironment($app)
+    protected function defineEnvironment($app): void
     {
-        // Setup environment, like app configuration
+        // Setup default environment configuration
         tap($app['config'], function (Repository $config) {
             $config->set('app.timezone', 'UTC');
             $config->set('app.locale', 'en');
@@ -58,27 +44,82 @@ class TestCase extends OrchestraTestCase
                 'database' => ':memory:',
                 'prefix' => '',
             ]);
+
+            // Setup default RabbitMQ configuration for tests
+            $config->set('rabbitmq.consumer_tag', 'test-consumer');
+            $config->set('rabbitmq.worker', [
+                'sleep' => 3,
+                'timeout' => 60,
+                'max_jobs' => 0,
+                'memory_limit' => 128,
+            ]);
         });
+    }
+
+    /**
+     * Get package providers.
+     *
+     * @param Application $app
+     * @return array<int, class-string>
+     */
+    protected function getPackageProviders($app): array
+    {
+        return [
+            LaravelRabbitMQServiceProvider::class,
+        ];
     }
 
     /**
      * Set up the database.
      *
-     * @param  \Illuminate\Foundation\Application  $app
+     * @param Application $app
      */
-    protected function setUpDatabase($app)
+    protected function setUpDatabase($app): void
     {
         $schema = $app['db']->connection()->getSchemaBuilder();
 
-        // Create tables
-
         $schema->create('users', function (Blueprint $table) {
-            $table->increments('id');
+            $table->id();
             $table->string('email');
+            $table->timestamps();
         });
     }
 
-    protected function defineDatabaseMigrations()
+    /**
+     * Set a mock instance for a given class in the container.
+     *
+     * @param string|mixed $abstract
+     * @param mixed $instance
+     * @return $this
+     */
+    public function instance($abstract, $instance)
+    {
+        $this->app->instance($abstract, $instance);
+
+        return $this;
+    }
+
+    /**
+     * Get a test RSA key pair.
+     *
+     * @return array{private: string, public: string}
+     */
+    protected function getTestKeyPair(): array
+    {
+        $rsa = \phpseclib3\Crypt\RSA::createKey(1024);
+
+        return [
+            'private' => $rsa->toString('PKCS1'),
+            'public' => $rsa->getPublicKey()->toString('PKCS1'),
+        ];
+    }
+
+    /**
+     * Define database migrations.
+     *
+     * @return void
+     */
+    protected function defineDatabaseMigrations(): void
     {
         if (! $this->loadWorkbenchMigrations) {
             return;
@@ -87,10 +128,5 @@ class TestCase extends OrchestraTestCase
         $this->loadMigrationsFrom(
             workbench_path('database/migrations')
         );
-    }
-
-    protected function getLaravelVersion()
-    {
-        return (float) app()->version();
     }
 }

@@ -8,6 +8,7 @@ use Exception;
 use Illuminate\Support\Facades\Log;
 use JuniorFontenele\LaravelRabbitMQ\Consumer;
 use JuniorFontenele\LaravelRabbitMQ\Tests\TestCase;
+use Mockery;
 use PhpAmqpLib\Message\AMQPMessage;
 use PhpAmqpLib\Wire\AMQPTable;
 
@@ -16,6 +17,8 @@ class ConsumerTest extends TestCase
     protected $consumer;
 
     protected $message;
+
+    protected $queueConfig;
 
     protected function setUp(): void
     {
@@ -33,6 +36,17 @@ class ConsumerTest extends TestCase
         $this->message = $this->createMock(AMQPMessage::class);
         $this->message->method('getBody')->willReturn(json_encode(['test' => 'data']));
         $this->message->method('getRoutingKey')->willReturn('notifications');
+
+        // Set default queue config
+        $this->queueConfig = [
+            'retry' => [
+                'enabled' => true,
+                'max_attempts' => 3,
+            ],
+        ];
+
+        // Configure queue retry settings in the config
+        config(['rabbitmq.queues.notifications' => $this->queueConfig]);
     }
 
     public function testProcessMessageSuccessfully()
@@ -52,13 +66,7 @@ class ConsumerTest extends TestCase
     public function testFailedMessageWithRetry()
     {
         // Setup a consumer that throws an exception during processing
-        $exceptionConsumer = new class extends Consumer
-        {
-            public function consume(AMQPMessage $message): void
-            {
-                throw new Exception('Test exception');
-            }
-        };
+        $exceptionConsumer = $this->createExceptionConsumer();
 
         // Configure message properties for retry
         $properties = [
@@ -77,33 +85,6 @@ class ConsumerTest extends TestCase
             ->method('reject')
             ->with(true);
 
-        // Configure queue retry settings in the config
-        $queueConfig = [
-            'queues' => [
-                'notifications' => [
-                    'retry' => [
-                        'enabled' => true,
-                        'max_attempts' => 3,
-                    ],
-                ],
-            ],
-        ];
-
-        // Mock config helper function
-        $configFunction = function ($key, $default = null) use ($queueConfig) {
-            return $key === 'rabbitmq.queues.notifications'
-                ? $queueConfig['queues']['notifications']
-                : $default;
-        };
-
-        // Replace global config function
-        if (! function_exists('config')) {
-            eval('function config($key, $default = null) { 
-                global $configFunction; 
-                return $configFunction($key, $default); 
-            }');
-        }
-
         // Execute the process method which will fail
         $exceptionConsumer->process($this->message);
     }
@@ -111,13 +92,7 @@ class ConsumerTest extends TestCase
     public function testFailedMessageMaxRetriesReached()
     {
         // Setup a consumer that throws an exception during processing
-        $exceptionConsumer = new class extends Consumer
-        {
-            public function consume(AMQPMessage $message): void
-            {
-                throw new Exception('Test exception');
-            }
-        };
+        $exceptionConsumer = $this->createExceptionConsumer();
 
         // Configure message properties for max retries
         $properties = [
@@ -136,34 +111,29 @@ class ConsumerTest extends TestCase
             ->method('reject')
             ->with(false);
 
-        // Configure queue retry settings in the config
-        $queueConfig = [
-            'queues' => [
-                'notifications' => [
-                    'retry' => [
-                        'enabled' => true,
-                        'max_attempts' => 3,
-                    ],
-                ],
-            ],
-        ];
-
-        // Mock config helper function
-        $configFunction = function ($key, $default = null) use ($queueConfig) {
-            return $key === 'rabbitmq.queues.notifications'
-                ? $queueConfig['queues']['notifications']
-                : $default;
-        };
-
-        // Replace global config function if needed
-        if (! function_exists('config')) {
-            eval('function config($key, $default = null) { 
-                global $configFunction; 
-                return $configFunction($key, $default); 
-            }');
-        }
-
         // Execute the process method which will fail
         $exceptionConsumer->process($this->message);
+    }
+
+    /**
+     * Create a consumer that throws an exception during processing.
+     *
+     * @return Consumer
+     */
+    private function createExceptionConsumer(): Consumer
+    {
+        return new class extends Consumer
+        {
+            public function consume(AMQPMessage $message): void
+            {
+                throw new Exception('Test exception');
+            }
+        };
+    }
+
+    protected function tearDown(): void
+    {
+        Mockery::close();
+        parent::tearDown();
     }
 }

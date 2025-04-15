@@ -9,7 +9,6 @@ use JuniorFontenele\LaravelRabbitMQ\Exceptions\RabbitMQException;
 use Mockery;
 use PhpAmqpLib\Channel\AMQPChannel;
 use PhpAmqpLib\Connection\AbstractConnection;
-use PhpAmqpLib\Connection\AMQPConnectionFactory;
 use PhpAmqpLib\Connection\AMQPStreamConnection;
 
 beforeEach(function () {
@@ -39,6 +38,10 @@ beforeEach(function () {
             ],
         ],
     ];
+
+    // Create a partial mock of the Connection class to avoid actual connections
+    $this->connectionMock = Mockery::mock(Connection::class, [$this->config])->makePartial();
+    $this->connectionMock->shouldAllowMockingProtectedMethods();
 });
 
 test('can get default connection', function () {
@@ -47,15 +50,13 @@ test('can get default connection', function () {
     $mockConnection->shouldReceive('isConnected')->andReturn(true);
     $mockConnection->shouldReceive('close');
 
-    // Use partial mock to override createConnection
-    $connection = Mockery::mock(Connection::class, [$this->config])->makePartial();
-    $connection->shouldAllowMockingProtectedMethods();
-    $connection->shouldReceive('createConnection')
+    // Set expectation on the createConnection method
+    $this->connectionMock->shouldReceive('createConnection')
         ->with('default')
         ->once()
         ->andReturn($mockConnection);
 
-    $result = $connection->getConnection();
+    $result = $this->connectionMock->getConnection();
 
     expect($result)->toBe($mockConnection);
 });
@@ -65,14 +66,12 @@ test('can get named connection', function () {
     $mockConnection->shouldReceive('isConnected')->andReturn(true);
     $mockConnection->shouldReceive('close');
 
-    $connection = Mockery::mock(Connection::class, [$this->config])->makePartial();
-    $connection->shouldAllowMockingProtectedMethods();
-    $connection->shouldReceive('createConnection')
+    $this->connectionMock->shouldReceive('createConnection')
         ->with('ssl_connection')
         ->once()
         ->andReturn($mockConnection);
 
-    $result = $connection->getConnection('ssl_connection');
+    $result = $this->connectionMock->getConnection('ssl_connection');
 
     expect($result)->toBe($mockConnection);
 });
@@ -87,14 +86,12 @@ test('can get channel', function () {
     $mockConnection->shouldReceive('isConnected')->andReturn(true);
     $mockConnection->shouldReceive('close');
 
-    $connection = Mockery::mock(Connection::class, [$this->config])->makePartial();
-    $connection->shouldAllowMockingProtectedMethods();
-    $connection->shouldReceive('getConnection')
+    $this->connectionMock->shouldReceive('getConnection')
         ->with('default')
         ->once()
         ->andReturn($mockConnection);
 
-    $result = $connection->getChannel();
+    $result = $this->connectionMock->getChannel();
 
     expect($result)->toBe($mockChannel);
 });
@@ -111,16 +108,13 @@ test('creates SSL connection when SSL is enabled', function () {
     $mockSslConnection->shouldReceive('isConnected')->andReturn(true);
     $mockSslConnection->shouldReceive('close');
 
-    // Instead of mocking the AMQPConnectionFactory class, use a partial mock on Connection
-    $connection = Mockery::mock(Connection::class, [$this->config])->makePartial();
-    $connection->shouldAllowMockingProtectedMethods();
-    $connection->shouldReceive('createConnection')
+    $this->connectionMock->shouldReceive('createConnection')
         ->with('ssl_connection')
         ->once()
         ->andReturn($mockSslConnection);
 
     // Get the connection
-    $result = $connection->getConnection('ssl_connection');
+    $result = $this->connectionMock->getConnection('ssl_connection');
 
     // Assert the result is our mock
     expect($result)->toBe($mockSslConnection);
@@ -132,18 +126,12 @@ test('creates non-SSL connection when SSL is disabled', function () {
     $mockNonSslConnection->shouldReceive('isConnected')->andReturn(true);
     $mockNonSslConnection->shouldReceive('close');
 
-    // Use a partial mock of the Connection class
-    // The first argument should be the class name, the second argument should be the constructor arguments
-    $connection = Mockery::mock(Connection::class, [$this->config])->makePartial();
-
-    // Mock the protected createConnection method to return our mock
-    $connection->shouldAllowMockingProtectedMethods();
-    $connection->shouldReceive('createConnection')
+    $this->connectionMock->shouldReceive('createConnection')
         ->with('default')
         ->andReturn($mockNonSslConnection);
 
     // Get the connection
-    $result = $connection->getConnection('default');
+    $result = $this->connectionMock->getConnection('default');
 
     // Assert
     expect($result)->toBe($mockNonSslConnection);
@@ -168,33 +156,31 @@ test('close method closes all connections and channels', function () {
     $mockConn2->shouldReceive('isConnected')->once()->andReturn(true);
     $mockConn2->shouldReceive('close')->once();
 
-    $connection = Mockery::mock(Connection::class, [$this->config])->makePartial();
-    $connection->shouldAllowMockingProtectedMethods();
-    $connection->shouldReceive('createConnection')
+    $this->connectionMock->shouldReceive('createConnection')
         ->with('default')
         ->andReturn($mockConn1);
-    $connection->shouldReceive('createConnection')
+    $this->connectionMock->shouldReceive('createConnection')
         ->with('ssl_connection')
         ->andReturn($mockConn2);
 
     // Create connections and channels
-    $connection->getConnection('default');
-    $connection->getConnection('ssl_connection');
-    $connection->getChannel('default');
-    $connection->getChannel('ssl_connection');
+    $this->connectionMock->getConnection('default');
+    $this->connectionMock->getConnection('ssl_connection');
+    $this->connectionMock->getChannel('default');
+    $this->connectionMock->getChannel('ssl_connection');
 
     // Close all connections
-    $connection->close();
+    $this->connectionMock->close();
 
     // Verify channels and connections arrays are reset
-    $reflection = new \ReflectionClass($connection);
+    $reflection = new \ReflectionClass($this->connectionMock);
     $channelsProp = $reflection->getProperty('channels');
     $channelsProp->setAccessible(true);
     $connectionsProp = $reflection->getProperty('connections');
     $connectionsProp->setAccessible(true);
 
-    expect($channelsProp->getValue($connection))->toBeEmpty();
-    expect($connectionsProp->getValue($connection))->toBeEmpty();
+    expect($channelsProp->getValue($this->connectionMock))->toBeEmpty();
+    expect($connectionsProp->getValue($this->connectionMock))->toBeEmpty();
 });
 
 afterEach(function () {

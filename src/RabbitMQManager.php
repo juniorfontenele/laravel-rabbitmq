@@ -124,20 +124,68 @@ class RabbitMQManager
      */
     public function setupChannel(string $queueName, AMQPChannel $channel): array
     {
+        $queueConfig = $this->getQueueConfig($queueName);
+        $exchangeKey = $queueConfig['exchange'] ?? 'default';
+        $exchangeConfig = $this->getExchangeConfig($exchangeKey);
+
+        // Setup exchange, queue and binding
+        $this->declareExchange($channel, $exchangeConfig);
+        $this->declareQueue($channel, $queueConfig);
+        $this->bindQueueToExchange($channel, $queueConfig, $exchangeConfig);
+        $this->setupQoS($channel, $queueConfig);
+
+        return [
+            'queue' => $queueConfig,
+            'exchange' => $exchangeConfig,
+            'consumer_tag' => config('rabbitmq.consumer_tag'),
+        ];
+    }
+
+    /**
+     * Get queue configuration.
+     *
+     * @param string $queueName
+     * @return array<string, mixed>
+     * @throws RabbitMQException
+     */
+    protected function getQueueConfig(string $queueName): array
+    {
         $queueConfig = config("rabbitmq.queues.{$queueName}");
 
         if (empty($queueConfig)) {
             throw new RabbitMQException("Queue [{$queueName}] not configured.");
         }
 
-        $exchangeKey = $queueConfig['exchange'] ?? 'default';
+        return $queueConfig;
+    }
+
+    /**
+     * Get exchange configuration.
+     *
+     * @param string $exchangeKey
+     * @return array<string, mixed>
+     * @throws RabbitMQException
+     */
+    protected function getExchangeConfig(string $exchangeKey): array
+    {
         $exchangeConfig = config("rabbitmq.exchanges.{$exchangeKey}");
 
         if (empty($exchangeConfig)) {
             throw new RabbitMQException("Exchange [{$exchangeKey}] not configured.");
         }
 
-        // Declare the exchange
+        return $exchangeConfig;
+    }
+
+    /**
+     * Declare exchange on the channel.
+     *
+     * @param AMQPChannel $channel
+     * @param array<string, mixed> $exchangeConfig
+     * @return void
+     */
+    protected function declareExchange(AMQPChannel $channel, array $exchangeConfig): void
+    {
         $channel->exchange_declare(
             $exchangeConfig['name'],
             $exchangeConfig['type'],
@@ -148,8 +196,17 @@ class RabbitMQManager
             false, // nowait
             $exchangeConfig['arguments'] ?? []
         );
+    }
 
-        // Declare the queue
+    /**
+     * Declare queue on the channel.
+     *
+     * @param AMQPChannel $channel
+     * @param array<string, mixed> $queueConfig
+     * @return void
+     */
+    protected function declareQueue(AMQPChannel $channel, array $queueConfig): void
+    {
         $channel->queue_declare(
             $queueConfig['name'],
             $queueConfig['passive'] ?? false,
@@ -159,22 +216,42 @@ class RabbitMQManager
             false, // nowait
             $queueConfig['arguments'] ?? []
         );
+    }
 
-        // Bind the queue to the exchange
+    /**
+     * Bind queue to exchange.
+     *
+     * @param AMQPChannel $channel
+     * @param array<string, mixed> $queueConfig
+     * @param array<string, mixed> $exchangeConfig
+     * @return void
+     */
+    protected function bindQueueToExchange(
+        AMQPChannel $channel,
+        array $queueConfig,
+        array $exchangeConfig
+    ): void {
         $channel->queue_bind(
             $queueConfig['name'],
             $exchangeConfig['name'],
             $queueConfig['routing_key'] ?? ''
         );
+    }
 
-        // Set QoS settings
+    /**
+     * Setup QoS settings.
+     *
+     * @param AMQPChannel $channel
+     * @param array<string, mixed> $queueConfig
+     * @return void
+     */
+    protected function setupQoS(AMQPChannel $channel, array $queueConfig): void
+    {
         $channel->basic_qos(
             $queueConfig['prefetch']['size'] ?? 0,
             $queueConfig['prefetch']['count'] ?? 1,
             false
         );
-
-        return ['queue' => $queueConfig, 'exchange' => $exchangeConfig, 'consumer_tag' => config('rabbitmq.consumer_tag')];
     }
 
     /**
