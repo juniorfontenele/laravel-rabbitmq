@@ -52,6 +52,13 @@ class Worker
     protected array $options = [];
 
     /**
+     * The channel configuration.
+     *
+     * @var array<string, mixed>
+     */
+    protected array $channelConfig = [];
+
+    /**
      * The current job being processed.
      *
      * @var AMQPMessage|null
@@ -122,20 +129,20 @@ class Worker
         $exchangeConfig = config("rabbitmq.exchanges.{$queueConfig['exchange']}", []);
         $this->channel = $this->manager->getConnection()->getChannel($exchangeConfig['connection'] ?? 'default');
 
-        $config = $this->manager->setupChannel($queue, $this->channel);
+        $this->channelConfig = $this->manager->setupChannel($queue, $this->channel);
 
-        $this->consumerTag = $config['consumer_tag'];
+        $this->consumerTag = $this->channelConfig['consumer_tag'];
 
         // Setup consumer
         $this->channel->basic_consume(
-            $config['queue']['name'],
+            $this->channelConfig['queue']['name'],
             $this->consumerTag,
             false,
             false,
             false,
             false,
-            function (AMQPMessage $message) use ($queue) {
-                $this->process($message, $queue);
+            function (AMQPMessage $AMQPMessage) use ($queue) {
+                $this->process($AMQPMessage, $queue);
             }
         );
 
@@ -168,27 +175,27 @@ class Worker
     /**
      * Process an incoming message.
      *
-     * @param AMQPMessage $message
+     * @param AMQPMessage $AMQPMessage
      * @param string $queue
      * @return void
      */
-    protected function process(AMQPMessage $message, string $queue): void
+    protected function process(AMQPMessage $AMQPMessage, string $queue): void
     {
         try {
-            $this->currentJob = $message;
+            $this->currentJob = $AMQPMessage;
 
             // Dispatch before processing event
-            $this->events->dispatch('rabbitmq.processing', [$message, $queue]);
+            $this->events->dispatch('rabbitmq.processing', [$AMQPMessage, $queue]);
 
-            $this->processMessage($message, $queue);
+            $this->processMessage($AMQPMessage, $queue);
 
             // Dispatch after processing event
-            $this->events->dispatch('rabbitmq.processed', [$message, $queue]);
+            $this->events->dispatch('rabbitmq.processed', [$AMQPMessage, $queue]);
 
             $this->jobsProcessed++;
         } catch (Throwable $e) {
             // Dispatch failed event
-            $this->events->dispatch('rabbitmq.failed', [$message, $queue, $e]);
+            $this->events->dispatch('rabbitmq.failed', [$AMQPMessage, $queue, $e]);
 
             $this->reportException($e);
         } finally {
@@ -198,34 +205,34 @@ class Worker
 
     /* Process the message with the appropriate consumer.
     *
-    * @param AMQPMessage $message
+    * @param AMQPMessage $AMQPMessage
     * @param string $queue
     * @return void
     */
-    protected function processMessage(AMQPMessage $message, string $queue): void
+    protected function processMessage(AMQPMessage $AMQPMessage, string $queue): void
     {
         // Log the message if verbose mode
         if ($this->options['verbose'] ?? false) {
-            $this->logVerboseMessage($message, $queue);
+            $this->logVerboseMessage($AMQPMessage, $queue);
         }
 
         $consumer = $this->manager->getConsumer($queue);
-        $consumer->process($message);
+        $consumer->process($AMQPMessage);
     }
 
     /**
      * Log verbose message details.
      *
-     * @param AMQPMessage $message
+     * @param AMQPMessage $AMQPMessage
      * @param string $queue
      * @return void
      */
-    protected function logVerboseMessage(AMQPMessage $message, string $queue): void
+    protected function logVerboseMessage(AMQPMessage $AMQPMessage, string $queue): void
     {
-        $body = $message->getBody();
+        $body = $AMQPMessage->getBody();
         $this->app->make('log')->info("Processing message from queue [{$queue}]", [
             'body' => $body,
-            'properties' => $message->get_properties(),
+            'properties' => $AMQPMessage->get_properties(),
         ]);
 
         if ($this->app->runningInConsole() && isset($this->options['output'])) {
