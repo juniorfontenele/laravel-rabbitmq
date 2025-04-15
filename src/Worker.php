@@ -106,7 +106,7 @@ class Worker
         // Setup consumer
         $channel->basic_consume(
             $config['queue']['name'],
-            $config['queue']['consumer_tag'],
+            $config['consumer_tag'],
             false,
             false,
             false,
