@@ -4,28 +4,19 @@ declare(strict_types = 1);
 
 namespace JuniorFontenele\LaravelRabbitMQ\Messages;
 
-use Illuminate\Console\Scheduling\Event;
 use Illuminate\Support\Str;
-use JuniorFontenele\LaravelRabbitMQ\Contracts\EventMessageInterface;
-use JuniorFontenele\LaravelRabbitMQ\Exceptions\MessageException;
+use JuniorFontenele\LaravelRabbitMQ\Contracts\MessageInterface;
 use PhpAmqpLib\Message\AMQPMessage;
 
-class EventMessage extends AbstractMessage implements EventMessageInterface
+class BasicMessage extends AbstractMessage implements MessageInterface
 {
     /**
-     * @var string The event name
-     */
-    protected string $event;
-
-    /**
-     * EventMessage constructor.
+     * BasicMessage constructor.
      *
-     * @param string $event The event name
      * @param array<string, mixed> $data The message data
      */
-    final protected function __construct(string $event, array $data)
+    protected function __construct(array $data = [])
     {
-        $this->event = $event;
         $this->data = $data;
 
         $this->options['message_id'] = $this->data['message_id'];
@@ -40,23 +31,16 @@ class EventMessage extends AbstractMessage implements EventMessageInterface
      * Create a message instance from an AMQPMessage.
      *
      * @param AMQPMessage $AMQPMessage The AMQP message
-     * @throws MessageException
-     * @return EventMessageInterface
+     * @throws \JuniorFontenele\LaravelRabbitMQ\Exceptions\MessageException
+     * @return MessageInterface
      */
-    public static function tryFrom(AMQPMessage $AMQPMessage): EventMessageInterface
+    public static function tryFrom(AMQPMessage $AMQPMessage): MessageInterface
     {
         $data = json_decode($AMQPMessage->getBody(), true, 512, JSON_THROW_ON_ERROR);
 
         static::validateMessageData($data);
 
-        if (! isset($data['event'])) {
-            throw new MessageException('Event not found in message data.');
-        }
-
-        $message = new static(
-            event: $data['event'],
-            data: $data
-        );
+        $message = new static(data: $data);
 
         return $message->routingKey($AMQPMessage->getRoutingKey() ?? '')
             ->options($AMQPMessage->get_properties())
@@ -64,14 +48,13 @@ class EventMessage extends AbstractMessage implements EventMessageInterface
     }
 
     /**
-     * Create a new event message instance.
+     * Create a new basic message instance.
      *
-     * @param string $event
      * @param array<string, mixed> $payload
      * @param string $correlationId
-     * @return EventMessageInterface
+     * @return MessageInterface
      */
-    public static function make(string $event, array $payload = [], string $correlationId = ''): EventMessageInterface
+    public static function make(array $payload = [], string $correlationId = ''): MessageInterface
     {
         $messageId = Str::uuid()->toString();
         $nonce = bin2hex(random_bytes(16));
@@ -83,20 +66,9 @@ class EventMessage extends AbstractMessage implements EventMessageInterface
             'correlation_id' => $correlationId,
             'nonce' => $nonce,
             'hostname' => gethostname(),
-            'event' => $event,
             'payload' => $payload,
         ];
 
-        return new static($event, $data);
-    }
-
-    /**
-     * Get the event name.
-     *
-     * @return string The event name
-     */
-    public function getEvent(): string
-    {
-        return $this->event;
+        return new static($data);
     }
 }
