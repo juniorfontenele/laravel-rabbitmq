@@ -99,22 +99,54 @@ class WorkerTest extends TestCase
     }
 
     /**
-     * This test now properly mocks the process method behavior in Worker
-     * based on examining the actual implementation
+     * This test properly mocks the process method behavior in Worker
      */
     public function testProcessUpdatesJobsProcessedCount(): void
     {
+        // Create a testable worker class that exposes protected methods for easier testing
+        $testableWorker = new class ($this->appContainer, $this->events, $this->manager) extends Worker
+        {
+            public function registerSignals(): void
+            {
+                // Disable signal handling in tests
+            }
+
+            public function publicProcess(AMQPMessage $message, string $queue): void
+            {
+                $this->process($message, $queue);
+            }
+
+            public function getJobsProcessed(): int
+            {
+                return $this->jobsProcessed;
+            }
+
+            public function setJobsProcessed(int $value): void
+            {
+                $this->jobsProcessed = $value;
+            }
+        };
+
         // Create mocks
         $message = Mockery::mock(AMQPMessage::class);
         $log = Mockery::mock(\Illuminate\Log\LogManager::class);
+        $consumer = Mockery::mock(\JuniorFontenele\LaravelRabbitMQ\Contracts\ConsumerInterface::class);
 
         // Setup expectations
         $this->appContainer->shouldReceive('make')->with('log')->andReturn($log);
         $log->shouldReceive('info')->byDefault();
         $log->shouldReceive('error')->byDefault();
 
-        // We won't mock getConsumer since it appears process doesn't directly call it
-        // Instead, process just dispatches events and increments the counter
+        // We need to mock getConsumer to match the actual implementation
+        $this->manager->shouldReceive('getConsumer')
+            ->once()
+            ->with('test-queue')
+            ->andReturn($consumer);
+
+        $consumer->shouldReceive('process')
+            ->once()
+            ->with($message)
+            ->andReturnNull(); // Ensure the consumer process completes successfully
 
         $this->events->shouldReceive('dispatch')
             ->with('rabbitmq.processing', [$message, 'test-queue'])
@@ -124,21 +156,15 @@ class WorkerTest extends TestCase
             ->with('rabbitmq.processed', [$message, 'test-queue'])
             ->once();
 
-        // Get initial jobs processed count
-        $reflection = new \ReflectionClass($this->worker);
-        $jobsProcessedProperty = $reflection->getProperty('jobsProcessed');
-        $jobsProcessedProperty->setAccessible(true);
-        $initialCount = $jobsProcessedProperty->getValue($this->worker);
+        // Set initial jobs processed count
+        $initialCount = 0;
+        $testableWorker->setJobsProcessed($initialCount);
 
-        // Access protected method using reflection
-        $processMethod = $reflection->getMethod('process');
-        $processMethod->setAccessible(true);
-
-        // Call process
-        $processMethod->invoke($this->worker, $message, 'test-queue');
+        // Call process via our public wrapper
+        $testableWorker->publicProcess($message, 'test-queue');
 
         // Verify jobs processed was incremented
-        $this->assertEquals($initialCount + 1, $jobsProcessedProperty->getValue($this->worker));
+        $this->assertEquals($initialCount + 1, $testableWorker->getJobsProcessed());
     }
 
     /**
