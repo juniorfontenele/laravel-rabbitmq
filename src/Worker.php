@@ -180,22 +180,6 @@ class Worker
             // Dispatch before processing event
             $this->events->dispatch('rabbitmq.processing', [$message, $queue]);
 
-            // Log the message if verbose mode
-            if ($this->options['verbose'] ?? false) {
-                $body = $message->getBody();
-                $this->app->make('log')->info("Processing message from queue [{$queue}]", [
-                    'body' => $body,
-                    'properties' => $message->get_properties(),
-                ]);
-
-                if ($this->app->runningInConsole() && isset($this->options['output'])) {
-                    $this->options['output']->writeln("<info>Processing message:</info> $body");
-                }
-            }
-
-            $consumer = $this->manager->getConsumer($queue);
-            $consumer->process($message);
-
             // Dispatch after processing event
             $this->events->dispatch('rabbitmq.processed', [$message, $queue]);
 
@@ -207,6 +191,43 @@ class Worker
             $this->reportException($e);
         } finally {
             $this->currentJob = null;
+        }
+    }
+
+    /* Process the message with the appropriate consumer.
+    *
+    * @param AMQPMessage $message
+    * @param string $queue
+    * @return void
+    */
+    protected function processMessage(AMQPMessage $message, string $queue): void
+    {
+        // Log the message if verbose mode
+        if ($this->options['verbose'] ?? false) {
+            $this->logVerboseMessage($message, $queue);
+        }
+
+        $consumer = $this->manager->getConsumer($queue);
+        $consumer->process($message);
+    }
+
+    /**
+     * Log verbose message details.
+     *
+     * @param AMQPMessage $message
+     * @param string $queue
+     * @return void
+     */
+    protected function logVerboseMessage(AMQPMessage $message, string $queue): void
+    {
+        $body = $message->getBody();
+        $this->app->make('log')->info("Processing message from queue [{$queue}]", [
+            'body' => $body,
+            'properties' => $message->get_properties(),
+        ]);
+
+        if ($this->app->runningInConsole() && isset($this->options['output'])) {
+            $this->options['output']->writeln("<info>Processing message:</info> $body");
         }
     }
 
