@@ -38,32 +38,10 @@ return [
     ],
 
     'exchanges' => [
-        'global_commands' => [
+        'default' => [
             'connection' => 'default',
-            'name' => 'global.commands',
+            'name' => 'default',
             'type' => 'fanout', // direct, topic, fanout, headers
-            'passive' => false,
-            'durable' => true,
-            'auto_delete' => false,
-            'internal' => false,
-            'arguments' => [],
-        ],
-
-        'app_commands' => [
-            'connection' => 'default',
-            'name' => $appName . '.commands',
-            'type' => 'fanout', // direct, topic, fanout, headers
-            'passive' => false,
-            'durable' => true,
-            'auto_delete' => false,
-            'internal' => false,
-            'arguments' => [],
-        ],
-
-        'events' => [
-            'connection' => 'default',
-            'name' => 'global.events',
-            'type' => 'topic', // direct, topic, fanout, headers
             'passive' => false,
             'durable' => true,
             'auto_delete' => false,
@@ -73,30 +51,10 @@ return [
     ],
 
     'queues' => [
-        'global_commands' => [
-            'name' => $appName . '.commands',
-            'exchange' => 'global_commands',
+        'default' => [
+            'name' => $appName . '.default',
+            'exchange' => 'default',
             'routing_key' => '',
-            'passive' => false,
-            'durable' => true,
-            'exclusive' => false,
-            'auto_delete' => false,
-            'arguments' => [],
-            'prefetch' => [
-                'count' => 1,
-                'size' => 0,
-            ],
-            'retry' => [
-                'enabled' => true,
-                'max_attempts' => 3,
-                'delay' => 60000, // in milliseconds
-            ],
-        ],
-
-        'app_commands' => [
-            'name' => $appName . '.commands',
-            'exchange' => 'app_commands',
-            'routing_key' => $appName . '.commands',
             'passive' => false,
             'durable' => true,
             'exclusive' => false,
