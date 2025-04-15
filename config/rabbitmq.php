@@ -11,12 +11,6 @@ $consumerTag = 'consumer.' . $appName . '.' . $hostname;
 return [
     'message_signing' => [
         'enabled' => env('RABBITMQ_SIGNING_ENABLED', false),
-        'algorithm' => env('RABBITMQ_SIGNING_ALGORITHM', 'sha256'),
-        'allowed_algorithms' => [
-            'sha256',
-            'sha384',
-            'sha512',
-        ],
         'verification_time_window' => env('RABBITMQ_SIGNING_TIME_WINDOW', 120), // in seconds
         'keys' => [
             'public' => env('RABBITMQ_SIGNING_PUBLIC_KEY'),

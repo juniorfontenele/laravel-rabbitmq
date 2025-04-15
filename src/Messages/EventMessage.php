@@ -4,28 +4,29 @@ declare(strict_types = 1);
 
 namespace JuniorFontenele\LaravelRabbitMQ\Messages;
 
-use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
-use JuniorFontenele\LaravelRabbitMQ\Contracts\MessageInterface;
+use JuniorFontenele\LaravelRabbitMQ\Contracts\EventMessageInterface;
 use JuniorFontenele\LaravelRabbitMQ\Exceptions\MessageException;
-use JuniorFontenele\LaravelRabbitMQ\Exceptions\MessageSignatureException;
-use JuniorFontenele\LaravelRabbitMQ\Exceptions\MessageSignatureExpiredException;
 use PhpAmqpLib\Message\AMQPMessage;
 
-class EventMessage implements MessageInterface
+class EventMessage extends AbstractMessage implements EventMessageInterface
 {
     /**
-     * @param string $event
-     * @param array<string, mixed> $data
-     * @param string $routingKey
-     * @param array<string, mixed> $options
+     * @var string The event name
      */
-    final protected function __construct(
-        protected string $event,
-        protected array $data,
-        protected string $routingKey = '',
-        protected array $options = [],
-    ) {
+    protected string $event;
+
+    /**
+     * EventMessage constructor.
+     *
+     * @param string $event The event name
+     * @param array<string, mixed> $data The message data
+     */
+    final protected function __construct(string $event, array $data)
+    {
+        $this->event = $event;
+        $this->data = $data;
+
         $this->options['message_id'] = $this->data['message_id'];
         $this->options['correlation_id'] = $this->data['correlation_id'];
 
@@ -34,22 +35,31 @@ class EventMessage implements MessageInterface
         }
     }
 
-    public static function tryFrom(AMQPMessage $message): static
+    /**
+     * Create a message instance from an AMQPMessage.
+     *
+     * @param AMQPMessage $AMQPMessage The AMQP message
+     * @throws MessageException
+     * @return EventMessageInterface
+     */
+    public static function tryFrom(AMQPMessage $AMQPMessage): EventMessageInterface
     {
-        $data = json_decode($message->getBody(), true, 512, JSON_THROW_ON_ERROR);
+        $data = json_decode($AMQPMessage->getBody(), true, 512, JSON_THROW_ON_ERROR);
+
+        static::validateMessageData($data);
 
         if (! isset($data['event'])) {
             throw new MessageException('Event not found in message data.');
         }
 
-        $eventMessage = new static(
+        $message = new static(
             event: $data['event'],
-            data: $data,
-            routingKey: $message->getRoutingKey() ?? '',
-            options: $message->get_properties()
+            data: $data
         );
 
-        return $eventMessage;
+        return $message->routingKey($AMQPMessage->getRoutingKey() ?? '')
+            ->options($AMQPMessage->get_properties())
+            ->setAMQPMessageInstance($AMQPMessage);
     }
 
     /**
@@ -57,9 +67,10 @@ class EventMessage implements MessageInterface
      *
      * @param string $event
      * @param array<string, mixed> $payload
-     * @return static
+     * @param string $correlationId
+     * @return EventMessageInterface
      */
-    public static function make(string $event, array $payload = [], string $correlationId = ''): static
+    public static function make(string $event, array $payload = [], string $correlationId = ''): EventMessageInterface
     {
         $messageId = Str::uuid()->toString();
         $nonce = bin2hex(random_bytes(16));
@@ -75,227 +86,44 @@ class EventMessage implements MessageInterface
             'payload' => $payload,
         ];
 
-        $eventMessage = new static($event, $data);
-
-        return $eventMessage;
-    }
-
-    public function getTimestamp(): Carbon
-    {
-        if (! isset($this->data['timestamp'])) {
-            throw new MessageException('Message timestamp is not set.');
-        }
-
-        return Carbon::parse($this->data['timestamp']);
-    }
-
-    public function getNonce(): string
-    {
-        return $this->data['nonce'];
-    }
-
-    public function getSignature(): string
-    {
-        if ($this->signingIsEnabled() && ! isset($this->data['signature'])) {
-            throw new MessageException('Message signature is not set.');
-        }
-
-        return $this->data['signature'] ?? '';
-    }
-
-    public function getSigningAlgorithm(): string
-    {
-        if ($this->signingIsEnabled() && ! isset($this->data['signing_algorithm'])) {
-            throw new MessageException('Message signature algorithm is not set.');
-        }
-
-        return $this->data['signing_algorithm'] ?? '';
+        return new static($event, $data);
     }
 
     /**
-     * @param string $publicKey
-     * @throws MessageSignatureException
-     * @throws MessageSignatureExpiredException
-     * @throws MessageException
-     * @return void
+     * Get the event name.
+     *
+     * @return string The event name
      */
-    public function validateSignature(string $publicKey): void
-    {
-        if (! $this->signingIsEnabled()) {
-            throw new MessageException('Message signing is not enabled.');
-        }
-
-        $signature = base64_decode($this->getSignature());
-        $algorithm = $this->getSigningAlgorithm();
-
-        $receivedData = $this->data;
-
-        $dataToVerify = array_filter($receivedData, function ($key) {
-            return $key !== 'signature' && $key !== 'signing_algorithm';
-        }, ARRAY_FILTER_USE_KEY);
-
-        $messageTimestamp = $this->getTimestamp();
-        $diff = $messageTimestamp->diffInSeconds(now());
-
-        $signTimeWindow = config('rabbitmq.message_signing.verification_time_window', 120);
-
-        if ($diff > $signTimeWindow) {
-            throw new MessageSignatureExpiredException('Message signature is expired.');
-        }
-
-        if ($diff < -$signTimeWindow) {
-            throw new MessageSignatureExpiredException('Message signature is not yet valid.');
-        }
-
-        ksort($dataToVerify);
-
-        $dataString = json_encode($dataToVerify, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES);
-
-        $opensslAlgorithm = $this->getAlgorithmFromString($algorithm);
-
-        $opensslVerify = openssl_verify(
-            $dataString,
-            $signature,
-            $publicKey,
-            $opensslAlgorithm
-        );
-
-        match ($opensslVerify) {
-            0 => throw new MessageSignatureException('Message signature is invalid.'),
-            -1 => throw new MessageException('Error verifying message signature: ' . openssl_error_string()),
-            default => null,
-        };
-    }
-
-    public function isSignatureValid(string $publicKey): bool
-    {
-        try {
-            $this->validateSignature($publicKey);
-
-            return true;
-        } catch (MessageSignatureException) {
-            return false;
-        } catch (MessageSignatureExpiredException) {
-            return false;
-        } catch (MessageException) {
-            return false;
-        }
-    }
-
-    public function routingKey(string $routingKey): static
-    {
-        $this->routingKey = $routingKey;
-
-        return $this;
-    }
-
-    /** @param array<string, mixed> $payload */
-    public function payload(array $payload): static
-    {
-        $this->data['payload'] = $payload;
-
-        return $this;
-    }
-
-    /** @return array<string, mixed> */
-    public function getPayload(): array
-    {
-        return $this->data['payload'];
-    }
-
-    /** @param array<string, mixed> $options */
-    public function options(array $options): static
-    {
-        $this->options = $options;
-
-        return $this;
-    }
-
-    public function getRoutingKey(): string
-    {
-        return $this->routingKey;
-    }
-
-    /** @return array<string, mixed> */
-    public function getData(): array
-    {
-        return $this->data;
-    }
-
     public function getEvent(): string
     {
         return $this->event;
     }
 
-    /** @return array<string, mixed> */
-    public function getOptions(): array
+    public function setAMQPMessageInstance(AMQPMessage $AMQPMessage): EventMessageInterface
     {
-        return $this->options;
+        parent::setAMQPMessageInstance($AMQPMessage);
+
+        return $this;
     }
 
-    public function getMessageId(): string
+    public function routingKey(string $routingKey): EventMessageInterface
     {
-        return $this->data['message_id'];
+        parent::routingKey($routingKey);
+
+        return $this;
     }
 
-    public function getCorrelationId(): string
+    public function options(array $options): EventMessageInterface
     {
-        return $this->data['correlation_id'];
+        parent::options($options);
+
+        return $this;
     }
 
-    protected function signingIsEnabled(): bool
+    public function payload(array $payload): EventMessageInterface
     {
-        return config('rabbitmq.message_signing.enabled', false)
-            && (! empty(config('rabbitmq.message_signing.keys.private')))
-            && (! empty(config('rabbitmq.message_signing.keys.public')));
-    }
+        parent::payload($payload);
 
-    protected function signMessage(): void
-    {
-        if (! $this->signingIsEnabled()) {
-            throw new MessageException('Trying to sign message but signing is disabled in rabbitmq.php config.');
-        }
-
-        $privateKey = config('rabbitmq.message_signing.keys.private');
-
-        $dataToSign = array_filter($this->data, function ($key) {
-            return $key !== 'signature' && $key !== 'signing_algorithm';
-        }, ARRAY_FILTER_USE_KEY);
-
-        ksort($dataToSign);
-
-        $dataString = json_encode($dataToSign, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES);
-
-        $algorithm = config('rabbitmq.message_signing.algorithm', 'sha256');
-        $opensslAlgorithm = $this->getAlgorithmFromString($algorithm);
-
-        openssl_sign(
-            $dataString,
-            $signature,
-            $privateKey,
-            $opensslAlgorithm
-        );
-
-        $base64Signature = base64_encode($signature);
-
-        $this->data['signature'] = $base64Signature;
-        $this->data['signing_algorithm'] = $algorithm;
-    }
-
-    protected function getAlgorithmFromString(string $algorithm): int
-    {
-        $allowedAlgorithms = config('rabbitmq.message_signing.allowed_algorithms', ['sha256', 'sha384', 'sha512']);
-
-        if (! in_array($algorithm, $allowedAlgorithms, true)) {
-            throw new MessageException('Invalid algorithm: ' . $algorithm);
-        }
-
-        $contantName = 'OPENSSL_ALGO_' . strtoupper($algorithm);
-
-        if (defined($contantName)) {
-            return constant($contantName);
-        }
-
-        throw new MessageException('Invalid algorithm: ' . $algorithm);
+        return $this;
     }
 }
