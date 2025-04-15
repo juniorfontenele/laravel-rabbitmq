@@ -183,6 +183,7 @@ RabbitMQ::publish('default', $message);
 ```
 
 The `EventMessage` automatically includes:
+
 - Timestamp
 - Application name
 - Hostname
@@ -217,26 +218,26 @@ class NotificationsConsumer extends Consumer
         // Parse message as a standard EventMessage
         try {
             $eventMessage = EventMessage::tryFrom($message);
-            
+
             // Access standardized event data
             $event = $eventMessage->getEvent();
             $payload = $eventMessage->getPayload();
             $messageId = $eventMessage->getMessageId();
             $correlationId = $eventMessage->getCorrelationId();
-            
+
             // Process based on event type
             match($event) {
                 'user.created' => $this->handleUserCreated($payload),
                 'user.updated' => $this->handleUserUpdated($payload),
                 default => $this->handleUnknownEvent($event, $payload),
             };
-            
+
             // Or process as raw data
             $data = json_decode($message->getBody(), true);
-            
+
             // Process the message
             // ...
-            
+
         } catch (\Exception $e) {
             // Handle error parsing the message
             $this->failed($message, $e);
@@ -246,17 +247,17 @@ class NotificationsConsumer extends Consumer
         // Acknowledge the message after successful processing
         $message->ack();
     }
-    
+
     protected function handleUserCreated(array $payload): void
     {
         // Handle user created event
     }
-    
+
     protected function handleUserUpdated(array $payload): void
     {
         // Handle user updated event
     }
-    
+
     protected function handleUnknownEvent(string $event, array $payload): void
     {
         // Handle unknown event
@@ -288,6 +289,7 @@ class AppServiceProvider extends ServiceProvider
 ```
 
 #### Consumer auto-discovery
+
 You can also auto-register consumers by adding them to the `App\Consumers`
 folder. You have to extend the base `JuniorFontenele\LaravelRabbitMQ\Consumer` class and use a studly name for class, e.g. `NotificationsConsumer` for the `notifications` queue. The package will automatically discover and register them.
 
@@ -327,9 +329,37 @@ $worker->work('notifications', [
 
 The package dispatches the following events:
 
+#### Message Events
+
 - `rabbitmq.processing`: Before processing a message
+    - Parameters: `AMQPMessage $message, string $queue`
 - `rabbitmq.processed`: After successful processing
+    - Parameters: `AMQPMessage $message, string $queue`
 - `rabbitmq.failed`: When processing fails
+    - Parameters: `AMQPMessage $message, string $queue, Throwable $exception`
+
+#### Worker Events
+
+- `rabbitmq.worker.starting`: When worker starts processing a queue
+    - Parameters: `string $queue`
+- `rabbitmq.worker.started`: After worker has started
+    - Parameters: `string $queue`
+- `rabbitmq.worker.restarting`: When worker is restarting
+    - Parameters: `string $queue`
+- `rabbitmq.worker.stopping`: When worker is about to stop
+    - Parameters: `string $stopType` ('hard', 'soft', or 'stop'), `int $status`
+- `rabbitmq.worker.stopped`: When worker has stopped
+    - Parameters: `string $queue`
+- `rabbitmq.worker.timeout`: When worker times out waiting for messages
+    - Parameters: `string $queue, AMQPTimeoutException $exception, bool $shouldSleep`
+- `rabbitmq.worker.error`: When an error occurs during worker execution
+    - Parameters: `string $queue, Throwable $exception`
+- `rabbitmq.worker.signal`: When worker receives a system signal
+    - Parameters: `int $signalNumber`
+- `rabbitmq.worker.alarm`: When worker receives an alarm signal
+    - Parameters: `int $signalNumber, int $memoryUsage`
+- `rabbitmq.worker.failed`: When worker fails to start
+    - Parameters: `string $queue, array $options, Throwable $exception`
 
 You can listen for these events in your `EventServiceProvider`:
 
@@ -343,6 +373,12 @@ protected $listen = [
     ],
     'rabbitmq.failed' => [
         \App\Listeners\LogFailedMessage::class,
+    ],
+    'rabbitmq.worker.starting' => [
+        \App\Listeners\LogWorkerStarting::class,
+    ],
+    'rabbitmq.worker.stopped' => [
+        \App\Listeners\LogWorkerStopped::class,
     ],
 ];
 ```
