@@ -403,7 +403,7 @@ class AbstractMessageTest extends TestCase
     {
         $allowedChars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
 
-        if (strlen($base64String) === 0) {
+        if ($base64String === '') {
             return '';
         }
 
