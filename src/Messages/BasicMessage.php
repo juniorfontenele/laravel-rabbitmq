@@ -62,6 +62,7 @@ class BasicMessage extends AbstractMessage
         $data = [
             'timestamp' => now()->toIso8601ZuluString(),
             'app' => config('app.name'),
+            'sender_id' => config('rabbitmq.sender_id'),
             'message_id' => $messageId,
             'correlation_id' => $correlationId,
             'nonce' => $nonce,

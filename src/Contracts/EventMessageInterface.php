@@ -36,4 +36,6 @@ interface EventMessageInterface extends MessageInterface
     public function options(array $options): EventMessageInterface;
 
     public function payload(array $payload): EventMessageInterface;
+
+    public function senderId(string $senderId): EventMessageInterface;
 }

@@ -214,6 +214,22 @@ abstract class AbstractMessage implements MessageInterface
         return $this->options;
     }
 
+    public function getSenderId(): string
+    {
+        if (! isset($this->data['sender_id'])) {
+            throw new MessageException('Message sender ID is not set.');
+        }
+
+        return $this->data['sender_id'];
+    }
+
+    public function senderId(string $senderId): MessageInterface
+    {
+        $this->data['sender_id'] = $senderId;
+
+        return $this;
+    }
+
     public function getMessageId(): string
     {
         if (! isset($this->data['message_id'])) {

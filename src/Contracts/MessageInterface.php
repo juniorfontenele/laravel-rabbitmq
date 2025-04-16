@@ -4,6 +4,7 @@ declare(strict_types = 1);
 
 namespace JuniorFontenele\LaravelRabbitMQ\Contracts;
 
+use Illuminate\Support\Carbon;
 use JuniorFontenele\LaravelRabbitMQ\Exceptions\MessageException;
 use PhpAmqpLib\Message\AMQPMessage;
 
@@ -19,6 +20,8 @@ interface MessageInterface extends DeliveryAwareInterface, RoutableInterface, Si
     /** @param array<string, mixed> $options */
     public function options(array $options): MessageInterface;
 
+    public function senderId(string $senderId): MessageInterface;
+
     /** @return array<string, mixed> */
     public function getData(): array;
 
@@ -31,6 +34,8 @@ interface MessageInterface extends DeliveryAwareInterface, RoutableInterface, Si
     /** @return array<string, mixed> */
     public function getPayload(): array;
 
+    public function getSenderId(): string;
+
     public function getMessageId(): string;
 
     public function getCorrelationId(): string;
@@ -39,4 +44,6 @@ interface MessageInterface extends DeliveryAwareInterface, RoutableInterface, Si
 
     /** @return array<string, mixed> */
     public function getHeader(): array;
+
+    public function getTimestamp(): Carbon;
 }
