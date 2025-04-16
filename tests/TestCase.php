@@ -47,6 +47,7 @@ class TestCase extends OrchestraTestCase
 
             // Setup default RabbitMQ configuration for tests
             $config->set('rabbitmq.consumer_tag', 'test-consumer');
+            $config->set('rabbitmq.sender_id', 'test-app');
             $config->set('rabbitmq.worker', [
                 'sleep' => 3,
                 'timeout' => 60,

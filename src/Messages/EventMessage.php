@@ -78,6 +78,7 @@ class EventMessage extends AbstractMessage implements EventMessageInterface
         $data = [
             'timestamp' => now()->toIso8601ZuluString(),
             'app' => config('app.name'),
+            'sender_id' => config('rabbitmq.sender_id'),
             'message_id' => $messageId,
             'correlation_id' => $correlationId,
             'nonce' => $nonce,
@@ -123,6 +124,13 @@ class EventMessage extends AbstractMessage implements EventMessageInterface
     public function payload(array $payload): EventMessageInterface
     {
         parent::payload($payload);
+
+        return $this;
+    }
+
+    public function senderId(string $senderId): EventMessageInterface
+    {
+        parent::senderId($senderId);
 
         return $this;
     }

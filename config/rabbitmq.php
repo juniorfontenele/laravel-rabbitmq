@@ -11,6 +11,8 @@ $consumerTag = 'consumer.' . $appName . '.' . $hostname;
 return [
     'consumer_tag' => env('RABBITMQ_CONSUMER_TAG', $consumerTag),
 
+    'sender_id' => env('RABBITMQ_SENDER_ID', $appName),
+
     'message_signing' => [
         'enabled' => env('RABBITMQ_SIGNING_ENABLED', false),
         'verification_time_window' => env('RABBITMQ_SIGNING_TIME_WINDOW', 120), // in seconds
