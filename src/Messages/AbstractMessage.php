@@ -295,10 +295,6 @@ abstract class AbstractMessage implements MessageInterface
      */
     public function validateSignature(string $publicKey): void
     {
-        if (! $this->signingIsEnabled()) {
-            throw new MessageException('Message signing is not enabled.');
-        }
-
         $signature = base64_decode($this->getSignature());
 
         $receivedData = $this->data;
