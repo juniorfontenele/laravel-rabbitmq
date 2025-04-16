@@ -14,18 +14,18 @@ class {{ class }} extends Consumer
     /**
      * Process the message.
      *
-     * @param AMQPMessage $message
+     * @param AMQPMessage $AMQPMessage
      * @return void
      * @throws Throwable
      */
-    public function consume(AMQPMessage $message): void
+    public function consume(AMQPMessage $AMQPMessage): void
     {
-        $data = json_decode($message->getBody(), true);
+        $data = json_decode($AMQPMessage->getBody(), true);
 
         // Process the message here...
         Log::info('Processing RabbitMQ message', ['data' => $data]);
 
         // Acknowledge the message
-        $message->ack();
+        $AMQPMessage->ack();
     }
 }

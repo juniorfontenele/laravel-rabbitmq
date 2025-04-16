@@ -12,26 +12,26 @@ interface ConsumerInterface
     /**
      * Process the message.
      *
-     * @param AMQPMessage $message
+     * @param AMQPMessage $AMQPMessage
      * @return void
      */
-    public function process(AMQPMessage $message): void;
+    public function process(AMQPMessage $AMQPMessage): void;
 
     /**
      * Consume the message.
      *
-     * @param AMQPMessage $message
+     * @param AMQPMessage $AMQPMessage
      * @return void
      * @throws Throwable
      */
-    public function consume(AMQPMessage $message): void;
+    public function consume(AMQPMessage $AMQPMessage): void;
 
     /**
      * Handle message processing failure.
      *
-     * @param AMQPMessage $message
+     * @param AMQPMessage $AMQPMessage
      * @param Throwable $exception
      * @return void
      */
-    public function failed(AMQPMessage $message, Throwable $exception): void;
+    public function failed(AMQPMessage $AMQPMessage, Throwable $exception): void;
 }

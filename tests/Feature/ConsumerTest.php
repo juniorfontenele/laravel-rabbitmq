@@ -124,7 +124,7 @@ class ConsumerTest extends TestCase
     {
         return new class extends Consumer
         {
-            public function consume(AMQPMessage $message): void
+            public function consume(AMQPMessage $AMQPMessage): void
             {
                 throw new Exception('Test exception');
             }
